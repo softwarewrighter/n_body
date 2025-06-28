@@ -13,6 +13,8 @@ pub struct Config {
 pub struct ServerConfig {
     pub port: u16,
     pub host: String,
+    #[serde(default)]
+    pub debug: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,6 +36,7 @@ impl Default for Config {
             server: ServerConfig {
                 port: 4000,
                 host: "0.0.0.0".to_string(),
+                debug: false,
             },
             simulation: SimulationConfig {
                 default_particles: 1000,
@@ -55,8 +58,15 @@ impl Config {
         if Path::new(config_path).exists() {
             match fs::read_to_string(config_path) {
                 Ok(content) => match toml::from_str(&content) {
-                    Ok(config) => {
+                    Ok(mut config) => {
                         log::info!("Loaded configuration from {}", config_path);
+                        
+                        // Check for debug environment variable override
+                        if std::env::var("N_BODY_DEBUG").is_ok() {
+                            config.server.debug = true;
+                            log::info!("Debug mode enabled via N_BODY_DEBUG environment variable");
+                        }
+                        
                         config
                     }
                     Err(e) => {
@@ -71,7 +81,13 @@ impl Config {
             }
         } else {
             log::info!("No config.toml found, using default configuration");
-            let config = Self::default();
+            let mut config = Self::default();
+            
+            // Check for debug environment variable override
+            if std::env::var("N_BODY_DEBUG").is_ok() {
+                config.server.debug = true;
+                log::info!("Debug mode enabled via N_BODY_DEBUG environment variable");
+            }
             
             // Write default config file
             if let Ok(toml_str) = toml::to_string_pretty(&config) {

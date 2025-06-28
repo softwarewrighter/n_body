@@ -23,6 +23,8 @@ pub struct SimulationConfig {
     pub gravity_strength: f32,
     pub visual_fps: u32,
     pub zoom_level: f32,
+    #[serde(default)]
+    pub debug: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

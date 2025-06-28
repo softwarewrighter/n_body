@@ -13,13 +13,14 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(sim_config: &crate::config::SimulationConfig) -> Self {
+    pub fn new(sim_config: &crate::config::SimulationConfig, debug: bool) -> Self {
         let config = SimulationConfig {
             particle_count: sim_config.default_particles,
             time_step: 0.01,
             gravity_strength: 1.0,
             visual_fps: 30,
             zoom_level: 1.0,
+            debug,
         };
         
         let mut sim = Simulation {

@@ -45,13 +45,20 @@ async fn main() -> std::io::Result<()> {
     let num_threads = num_cpus::get();
     info!("Starting N-Body server with {} CPU threads", num_threads);
     
+    if config.server.debug {
+        info!("=== DEBUG MODE ENABLED ===");
+        info!("Server config: {:?}", config.server);
+        info!("Simulation config: {:?}", config.simulation);
+        info!("WebSocket config: {:?}", config.websocket);
+    }
+    
     // Initialize rayon with all available threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
 
-    let simulation = Arc::new(Mutex::new(Simulation::new(&config.simulation)));
+    let simulation = Arc::new(Mutex::new(Simulation::new(&config.simulation, config.server.debug)));
     let app_state = web::Data::new(AppState { 
         simulation,
         config: config.clone(),

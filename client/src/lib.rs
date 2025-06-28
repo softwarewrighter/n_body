@@ -31,6 +31,7 @@ impl Client {
             gravity_strength: 1.0,
             visual_fps: 30,
             zoom_level: 1.0,
+            debug: false,
         };
         
         Ok(Client {
@@ -111,7 +112,10 @@ impl Client {
         match serde_json::from_str::<ServerMessage>(&message) {
             Ok(msg) => match msg {
                 ServerMessage::State(state) => {
-                    console::log_1(&format!("Received {} particles", state.particles.len()).into());
+                    if self.config.debug {
+                        console::log_1(&format!("Received state: {} particles, frame {}, sim_time {:.2}s", 
+                            state.particles.len(), state.frame_number, state.sim_time).into());
+                    }
                     self.current_state = Some(state);
                     self.render();
                 }
@@ -128,8 +132,13 @@ impl Client {
                         .unwrap();
                 }
                 ServerMessage::Config(config) => {
-                    console::log_1(&format!("Received config: {} particles", config.particle_count).into());
+                    console::log_1(&format!("Received config: {} particles, debug: {}", config.particle_count, config.debug).into());
                     self.config = config.clone();
+                    
+                    // Enable debug logging if requested
+                    if config.debug {
+                        console::log_1(&"Debug mode enabled - verbose client logging active".into());
+                    }
                     
                     // Update UI elements via JavaScript
                     let window = web_sys::window().unwrap();
