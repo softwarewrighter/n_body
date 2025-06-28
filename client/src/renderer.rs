@@ -4,7 +4,7 @@ use web_sys::{
     HtmlCanvasElement, WebGlBuffer, WebGlProgram, WebGlRenderingContext as GL,
     WebGlShader, WebGlUniformLocation,
 };
-use crate::particle::Particle;
+use n_body_shared::Particle;
 
 pub struct Renderer {
     gl: GL,

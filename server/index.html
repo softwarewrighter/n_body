@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N-Body Galaxy Collision Simulation</title>
+    <title>N-Body Galaxy Collision Simulation (Server-Powered)</title>
     <style>
         * {
             margin: 0;
@@ -134,6 +134,31 @@
             color: #4CAF50;
         }
         
+        #connection-status {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .connected {
+            color: #4CAF50;
+        }
+        
+        .disconnected {
+            color: #f44336;
+        }
+        
+        .server-indicator {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
         .hidden {
             display: none;
         }
@@ -142,12 +167,18 @@
 <body>
     <canvas id="canvas"></canvas>
     
+    <div id="connection-status" class="disconnected">
+        Connecting to server...
+        <div class="server-indicator">Server: <span id="serverUrl"></span></div>
+    </div>
+    
     <div id="controls">
         <h2>Galaxy Collision Controls</h2>
+        <div class="server-indicator">Computation: Server-side (72 threads)</div>
         
         <div class="control-group">
             <label for="particleCount">Particles: <span id="particleCountValue">10000</span></label>
-            <input type="range" id="particleCount" min="1000" max="100000" value="10000" step="1000">
+            <input type="range" id="particleCount" min="1000" max="1000000" value="10000" step="1000">
         </div>
         
         <div class="control-group">
@@ -170,16 +201,56 @@
     </div>
     
     <div id="stats">
-        <div class="stat-line">FPS: <span class="value" id="fps">0</span></div>
-        <div class="stat-line">Sim Time: <span class="value" id="simTime">0.0</span>s</div>
+        <div class="stat-line">Server FPS: <span class="value" id="fps">0</span></div>
+        <div class="stat-line">Compute Time: <span class="value" id="computeTime">0</span>ms</div>
         <div class="stat-line">Particles: <span class="value" id="activeParticles">0</span></div>
-        <div class="stat-line">Frame Time: <span class="value" id="frameTime">0</span>ms</div>
+        <div class="stat-line">Sim Time: <span class="value" id="simTime">0.0</span>s</div>
+        <div class="stat-line">CPU Usage: <span class="value" id="cpuUsage">0</span>%</div>
     </div>
     
     <div id="loading">Loading WASM...</div>
     
     <script type="module">
-        import init, { Simulation } from './pkg/n_body.js';
+        import init, { Client } from './pkg/n_body_client.js';
+        
+        let client = null;
+        let isPaused = false;
+        
+        // Global function for WebSocket message handling
+        window.handleWebSocketMessage = function(message) {
+            if (client) {
+                client.handle_message(message);
+            }
+        };
+        
+        // Global function for stats updates
+        window.updateStats = function(statsJson) {
+            const stats = JSON.parse(statsJson);
+            document.getElementById('fps').textContent = stats.fps.toFixed(1);
+            document.getElementById('computeTime').textContent = stats.computation_time_ms.toFixed(2);
+            document.getElementById('activeParticles').textContent = stats.particle_count;
+            document.getElementById('simTime').textContent = stats.sim_time.toFixed(1);
+            document.getElementById('cpuUsage').textContent = stats.cpu_usage.toFixed(1);
+        };
+        
+        // Global function for connection status updates
+        window.updateConnectionStatus = function(connected) {
+            const status = document.getElementById('connection-status');
+            const serverUrl = document.getElementById('serverUrl')?.textContent || 'ws://localhost:8080/ws';
+            if (connected) {
+                status.className = 'connected';
+                status.innerHTML = 'Connected to server<div class="server-indicator">Server: ' + serverUrl + '</div>';
+            } else {
+                status.className = 'disconnected';
+                status.innerHTML = 'Disconnected from server - Reconnecting in 3s...<div class="server-indicator">Server: ' + serverUrl + '</div>';
+                
+                // Auto-reconnect after 3 seconds
+                setTimeout(() => {
+                    console.log('Attempting to reconnect...');
+                    window.location.reload();
+                }, 3000);
+            }
+        };
         
         async function run() {
             await init();
@@ -188,60 +259,59 @@
             loading.classList.add('hidden');
             
             const canvas = document.getElementById('canvas');
-            const simulation = new Simulation(canvas);
             
-            // Animation loop
-            function animate() {
-                simulation.step();
-                requestAnimationFrame(animate);
-            }
+            // Determine WebSocket URL
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname || 'localhost';
+            const port = window.location.port || '8080';
+            const serverUrl = `${protocol}//${host}:${port}/ws`;
             
-            // Start the simulation
-            simulation.start();
-            simulation.resize();
-            animate();
+            document.getElementById('serverUrl').textContent = serverUrl;
+            
+            // Create client
+            client = new Client(canvas, serverUrl);
+            
+            // Start client (WebSocket handlers are set up internally)
+            client.start();
             
             // Handle window resize
             window.addEventListener('resize', () => {
-                simulation.resize();
+                client.resize();
             });
             
             // Control handlers
             document.getElementById('particleCount').addEventListener('input', (e) => {
                 const value = parseInt(e.target.value);
                 document.getElementById('particleCountValue').textContent = value;
-                simulation.set_particle_count(value);
+                client.set_particle_count(value);
             });
             
             document.getElementById('timeStep').addEventListener('input', (e) => {
                 const value = parseFloat(e.target.value);
                 document.getElementById('timeStepValue').textContent = value.toFixed(3);
-                simulation.set_time_step(value);
+                client.set_time_step(value);
             });
             
             document.getElementById('gravity').addEventListener('input', (e) => {
                 const value = parseFloat(e.target.value);
                 document.getElementById('gravityValue').textContent = value.toFixed(1);
-                simulation.set_gravity_strength(value);
+                client.set_gravity_strength(value);
             });
             
             document.getElementById('resetBtn').addEventListener('click', () => {
-                simulation.reset();
+                client.reset();
             });
             
             document.getElementById('pauseBtn').addEventListener('click', (e) => {
-                const isPaused = simulation.toggle_pause();
-                e.target.textContent = isPaused ? 'Resume' : 'Pause';
+                if (isPaused) {
+                    client.resume();
+                    e.target.textContent = 'Pause';
+                } else {
+                    client.pause();
+                    e.target.textContent = 'Resume';
+                }
+                isPaused = !isPaused;
             });
-            
-            // Update stats
-            setInterval(() => {
-                const stats = simulation.get_stats();
-                document.getElementById('fps').textContent = stats.fps.toFixed(1);
-                document.getElementById('simTime').textContent = stats.sim_time.toFixed(1);
-                document.getElementById('activeParticles').textContent = stats.particle_count;
-                document.getElementById('frameTime').textContent = stats.frame_time.toFixed(2);
-            }, 100);
         }
         
         run();

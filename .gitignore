@@ -1,5 +1,6 @@
 /target
 /pkg
+/server/pkg
 /node_modules
 Cargo.lock
 **/*.rs.bk

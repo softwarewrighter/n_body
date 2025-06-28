@@ -1,0 +1,24 @@
+[package]
+name = "n_body_server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "n_body_server"
+path = "src/main.rs"
+
+[dependencies]
+n_body_shared = { path = "../shared" }
+actix = "0.13"
+actix-web = "4"
+actix-web-actors = "4.3"
+actix-cors = "0.7"
+tokio = { version = "1", features = ["full"] }
+rayon = "1.10"
+nalgebra = { version = "0.33", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+env_logger = "0.11"
+log = "0.4"
+num_cpus = "1.16"
+actix-files = "0.6"

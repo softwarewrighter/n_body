@@ -23,17 +23,18 @@ if [ ! -f "Cargo.toml" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}📦 Building WASM module...${NC}"
+echo -e "${GREEN}📦 Building server...${NC}"
+cargo build --release -p n_body_server
 
-# Build the WASM module
-wasm-pack build --target web --out-dir pkg
+echo -e "${GREEN}📦 Building WASM client...${NC}"
+cd client && wasm-pack build --target web --out-dir ../server/pkg && cd ..
 
 echo -e "${GREEN}✅ Build complete!${NC}"
 echo -e "${YELLOW}📝 Next steps:${NC}"
-echo -e "   1. Run ${GREEN}./scripts/serve.sh${NC} to start the development server"
-echo -e "   2. Open ${GREEN}http://localhost:8000${NC} in your browser"
+echo -e "   1. Run ${GREEN}./scripts/serve.sh${NC} to start the server"
+echo -e "   2. Open ${GREEN}http://localhost:8080${NC} in your browser"
 echo ""
 echo -e "${YELLOW}📊 Build artifacts:${NC}"
-echo -e "   - WASM module: ${GREEN}pkg/n_body_bg.wasm${NC}"
-echo -e "   - JavaScript bindings: ${GREEN}pkg/n_body.js${NC}"
-echo -e "   - TypeScript definitions: ${GREEN}pkg/n_body.d.ts${NC}"
+echo -e "   - Server binary: ${GREEN}target/release/n_body_server${NC}"
+echo -e "   - WASM module: ${GREEN}server/pkg/n_body_client_bg.wasm${NC}"
+echo -e "   - JavaScript bindings: ${GREEN}server/pkg/n_body_client.js${NC}"

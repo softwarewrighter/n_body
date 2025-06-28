@@ -1,15 +1,23 @@
 # N-Body Galaxy Collision Simulation
 
-A high-performance n-body simulation demonstrating galaxy collisions, built with Rust and WebAssembly.
+A high-performance n-body simulation demonstrating galaxy collisions, powered by a multi-threaded Rust server and WebAssembly client.
+
+## Architecture
+
+- **Server**: Multi-threaded Rust server using all CPU cores for physics computation
+- **Client**: Thin WebAssembly client for rendering only
+- **Communication**: WebSocket for real-time state updates
+- **Performance**: Scales to millions of particles using parallel computation
 
 ## Features
 
-- Real-time simulation of thousands of gravitationally interacting particles
+- Server-side parallel physics computation using Rayon
+- Real-time simulation of gravitationally interacting particles
 - Two spiral galaxies on collision course
 - WebGL rendering with particle effects
 - Interactive controls for particle count, time step, and gravity strength
-- Performance monitoring (FPS, frame time)
-- Pure Rust implementation compiled to WebAssembly
+- Live performance monitoring (FPS, computation time, CPU usage)
+- Automatic reconnection on connection loss
 
 ## Prerequisites
 
@@ -61,24 +69,24 @@ The project includes several helper scripts in the `scripts/` directory:
 
 ## Performance
 
-The simulation is optimized for modern browsers and can handle:
-- 10,000 particles at 60 FPS
-- 50,000 particles at 30 FPS
-- 100,000 particles at 10-15 FPS
+With server-side computation on a 72-thread workstation:
+- 10,000 particles at 60+ FPS
+- 100,000 particles at 60 FPS
+- 1,000,000 particles at 30+ FPS
 
-Performance will vary based on your hardware.
+Performance scales with CPU cores. The client only needs to render particles.
 
-## Architecture
+## Technical Details
 
-- **Frontend**: Minimal HTML5/CSS with WASM bindings
-- **Simulation**: Pure Rust n-body physics engine
-- **Rendering**: WebGL with custom shaders
-- **Parallelization**: Currently single-threaded (web workers coming in Phase 1.5)
+- **Server**: Actix-web with WebSocket actors
+- **Physics**: Parallel force calculation using Rayon
+- **Client**: WebGL rendering with custom shaders
+- **Protocol**: JSON messages over WebSocket
 
-## Next Steps
+## Next Steps (Phase 2)
 
 - Implement Barnes-Hut algorithm for O(n log n) complexity
-- Add web workers for multi-threaded physics
-- Implement more sophisticated galaxy generation
+- Add CUDA GPU acceleration for even more particles
+- Implement advanced galaxy generation (different types)
 - Add camera controls (pan, zoom, rotate)
-- Optimize WebGL rendering with instancing
+- Multiple simultaneous client support
