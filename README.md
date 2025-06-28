@@ -17,23 +17,39 @@ A high-performance n-body simulation demonstrating galaxy collisions, built with
 - wasm-pack (`cargo install wasm-pack`)
 - A modern web browser with WebGL support
 
-## Building
+## Quick Start
 
 1. Clone the repository
-2. Run the build script:
+2. Build and run in development mode:
    ```bash
-   ./build_wasm.sh
+   ./scripts/dev.sh
    ```
+3. Open http://localhost:8000 in your browser
 
-## Running
+## Scripts
 
-After building, serve the files with any HTTP server:
+The project includes several helper scripts in the `scripts/` directory:
+
+- **`dev.sh`** - Build and start development server (recommended for development)
+- **`build.sh`** - Build the WASM module only
+- **`serve.sh`** - Start the development server (with optional port argument)
+- **`clean.sh`** - Clean build artifacts (use `--all` to also remove Cargo.lock)
+
+### Examples
 
 ```bash
-python3 -m http.server 8000
-```
+# Build and serve (development mode)
+./scripts/dev.sh
 
-Then open http://localhost:8000 in your browser.
+# Build only
+./scripts/build.sh
+
+# Serve on a custom port
+./scripts/serve.sh 3000
+
+# Clean all build artifacts
+./scripts/clean.sh --all
+```
 
 ## Controls
 
