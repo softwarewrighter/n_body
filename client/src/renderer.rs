@@ -16,6 +16,8 @@ pub struct Renderer {
     width: f32,
     height: f32,
     zoom: f32,
+    camera_x: f32,
+    camera_y: f32,
 }
 
 impl Renderer {
@@ -68,6 +70,8 @@ impl Renderer {
             width: canvas.width() as f32,
             height: canvas.height() as f32,
             zoom: 1.0,
+            camera_x: 0.0,
+            camera_y: 0.0,
         })
     }
     
@@ -79,6 +83,18 @@ impl Renderer {
     
     pub fn set_zoom(&mut self, zoom: f32) {
         self.zoom = zoom;
+    }
+    
+    pub fn move_camera(&mut self, dx: f32, dy: f32) {
+        // Movement speed scales with zoom level for intuitive control
+        let movement_scale = 2.0 / self.zoom;
+        self.camera_x += dx * movement_scale;
+        self.camera_y += dy * movement_scale;
+    }
+    
+    pub fn reset_camera(&mut self) {
+        self.camera_x = 0.0;
+        self.camera_y = 0.0;
     }
     
     pub fn render(&self, particles: &[Particle]) {
@@ -140,12 +156,13 @@ impl Renderer {
         let projection = self.perspective_matrix(fov, aspect, near, far);
         self.gl.uniform_matrix4fv_with_f32_array(Some(&self.u_projection), false, &projection);
         
-        // Apply zoom by adjusting camera distance
-        let camera_distance = 20.0 / self.zoom;
+        // Apply zoom by adjusting camera distance and position
+        // Start with a closer initial view (was 20.0, now 10.0 for better initial scale)
+        let camera_distance = 10.0 / self.zoom;
         let view = self.look_at_matrix(
-            [0.0, 0.0, camera_distance],  // eye (zoomed)
-            [0.0, 0.0, 0.0],             // center
-            [0.0, 1.0, 0.0],             // up
+            [self.camera_x, self.camera_y, camera_distance],  // eye (zoomed and positioned)
+            [self.camera_x, self.camera_y, 0.0],             // center (follows camera)
+            [0.0, 1.0, 0.0],                                 // up
         );
         self.gl.uniform_matrix4fv_with_f32_array(Some(&self.u_view), false, &view);
         

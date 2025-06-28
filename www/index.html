@@ -259,6 +259,11 @@
             <button id="pauseBtn">Pause</button>
             <button id="resetBtn">Reset</button>
         </div>
+        
+        <div class="control-group">
+            <button id="resetCameraBtn">Reset Camera</button>
+            <div class="help-text">Use ↑↓←→ arrow keys to move camera view</div>
+        </div>
     </div>
     
     <div id="stats">
@@ -478,6 +483,32 @@
                 client.resize();
             });
             
+            // Arrow key camera controls
+            window.addEventListener('keydown', (e) => {
+                if (!client) return;
+                
+                const moveAmount = 0.5; // Movement amount per key press
+                
+                switch(e.code) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        client.move_camera(0, moveAmount);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        client.move_camera(0, -moveAmount);
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        client.move_camera(-moveAmount, 0);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        client.move_camera(moveAmount, 0);
+                        break;
+                }
+            });
+            
             // Control handlers with improved UX
             document.getElementById('particleCount').addEventListener('input', (e) => {
                 const sliderValue = parseInt(e.target.value);
@@ -571,6 +602,20 @@
                 } catch (e) {
                     console.error('Pause/resume failed:', e);
                     setButtonWorking('pauseBtn', false);
+                }
+            });
+            
+            document.getElementById('resetCameraBtn').addEventListener('click', () => {
+                if (!client) {
+                    console.warn('Cannot reset camera: client not initialized');
+                    return;
+                }
+                
+                try {
+                    client.reset_camera();
+                    console.log('Camera reset to center');
+                } catch (e) {
+                    console.error('Camera reset failed:', e);
                 }
             });
         }

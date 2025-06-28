@@ -211,6 +211,14 @@ impl Client {
         }
     }
     
+    pub fn move_camera(&mut self, dx: f32, dy: f32) {
+        self.renderer.move_camera(dx, dy);
+    }
+    
+    pub fn reset_camera(&mut self) {
+        self.renderer.reset_camera();
+    }
+    
     fn is_connected(&self) -> bool {
         self.ws.ready_state() == WebSocket::OPEN
     }
