@@ -126,7 +126,17 @@ impl Client {
                         .unwrap();
                 }
                 ServerMessage::Config(config) => {
-                    self.config = config;
+                    console::log_1(&format!("Received config: {} particles", config.particle_count).into());
+                    self.config = config.clone();
+                    
+                    // Update UI elements via JavaScript
+                    let window = web_sys::window().unwrap();
+                    if let Some(update_ui) = window.get("updateUIFromConfig") {
+                        if let Some(function) = update_ui.dyn_ref::<js_sys::Function>() {
+                            let config_json = serde_json::to_string(&config).unwrap();
+                            let _ = function.call1(&JsValue::NULL, &JsValue::from_str(&config_json));
+                        }
+                    }
                 }
             },
             Err(e) => {

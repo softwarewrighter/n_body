@@ -32,7 +32,7 @@ async fn index() -> Result<HttpResponse, Error> {
     info!("Index route called");
     Ok(HttpResponse::Ok()
         .content_type("text/html")
-        .body(include_str!("../index.html")))
+        .body(include_str!("../../www/index.html")))
 }
 
 #[actix_web::main]
@@ -74,7 +74,7 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
             .route("/ws", web::get().to(ws_index))
-            .service(actix_files::Files::new("/pkg", "server/pkg").show_files_listing())
+            .service(actix_files::Files::new("/", "www").index_file("index.html"))
     })
     .bind(&bind_address)?
     .run()

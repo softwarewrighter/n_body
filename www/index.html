@@ -233,6 +233,24 @@
             document.getElementById('cpuUsage').textContent = stats.cpu_usage.toFixed(1);
         };
         
+        // Global function for UI updates from server config
+        window.updateUIFromConfig = function(configJson) {
+            const config = JSON.parse(configJson);
+            console.log('Updating UI with config:', config);
+            
+            // Update particle count slider and display
+            document.getElementById('particleCount').value = config.particle_count;
+            document.getElementById('particleCountValue').textContent = config.particle_count;
+            
+            // Update time step slider and display
+            document.getElementById('timeStep').value = config.time_step;
+            document.getElementById('timeStepValue').textContent = config.time_step.toFixed(3);
+            
+            // Update gravity strength slider and display
+            document.getElementById('gravity').value = config.gravity_strength;
+            document.getElementById('gravityValue').textContent = config.gravity_strength.toFixed(1);
+        };
+        
         // Global function for connection status updates
         window.updateConnectionStatus = function(connected) {
             const status = document.getElementById('connection-status');
