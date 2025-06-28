@@ -21,6 +21,8 @@ pub struct SimulationConfig {
     pub particle_count: usize,
     pub time_step: f32,
     pub gravity_strength: f32,
+    pub visual_fps: u32,
+    pub zoom_level: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

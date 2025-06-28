@@ -26,9 +26,11 @@ impl Client {
         let renderer = Renderer::new(&canvas)?;
         
         let config = SimulationConfig {
-            particle_count: 10000,
+            particle_count: 3000,
             time_step: 0.01,
             gravity_strength: 1.0,
+            visual_fps: 30,
+            zoom_level: 1.0,
         };
         
         Ok(Client {
@@ -187,6 +189,25 @@ impl Client {
             self.send_config_update();
         } else {
             console::log_1(&"Cannot update gravity strength: WebSocket not connected".into());
+        }
+    }
+    
+    pub fn set_visual_fps(&mut self, fps: u32) {
+        self.config.visual_fps = fps;
+        if self.is_connected() {
+            self.send_config_update();
+        } else {
+            console::log_1(&"Cannot update visual FPS: WebSocket not connected".into());
+        }
+    }
+    
+    pub fn set_zoom_level(&mut self, zoom: f32) {
+        self.config.zoom_level = zoom;
+        self.renderer.set_zoom(zoom);
+        if self.is_connected() {
+            self.send_config_update();
+        } else {
+            console::log_1(&"Cannot update zoom level: WebSocket not connected".into());
         }
     }
     

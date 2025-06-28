@@ -233,12 +233,26 @@
         
         <div class="control-group">
             <label for="timeStep">Time Step: <span id="timeStepValue">0.01</span></label>
-            <input type="range" id="timeStep" min="0.001" max="0.1" value="0.01" step="0.001">
+            <input type="range" id="timeStep" min="0.005" max="0.05" value="0.01" step="0.005">
+            <div class="help-text">Physics simulation speed</div>
+        </div>
+        
+        <div class="control-group">
+            <label for="visualFPS">Visual FPS: <span id="visualFPSValue">30</span></label>
+            <input type="range" id="visualFPS" min="10" max="60" value="30" step="5">
+            <div class="help-text">Rendering speed (independent of physics)</div>
+        </div>
+        
+        <div class="control-group">
+            <label for="zoom">Zoom: <span id="zoomValue">1.0x</span></label>
+            <input type="range" id="zoom" min="0.1" max="5.0" value="1.0" step="0.1">
+            <div class="help-text">Camera view scale</div>
         </div>
         
         <div class="control-group">
             <label for="gravity">Gravity Strength: <span id="gravityValue">1.0</span></label>
             <input type="range" id="gravity" min="0.1" max="5.0" value="1.0" step="0.1">
+            <div class="help-text">Gravitational force multiplier</div>
         </div>
         
         <div class="control-group button-row">
@@ -299,6 +313,14 @@
             // Update gravity strength slider and display
             document.getElementById('gravity').value = config.gravity_strength;
             document.getElementById('gravityValue').textContent = config.gravity_strength.toFixed(1);
+            
+            // Update visual FPS slider and display
+            document.getElementById('visualFPS').value = config.visual_fps;
+            document.getElementById('visualFPSValue').textContent = config.visual_fps;
+            
+            // Update zoom slider and display
+            document.getElementById('zoom').value = config.zoom_level;
+            document.getElementById('zoomValue').textContent = config.zoom_level.toFixed(1) + 'x';
             
             // Reset button states if they were working
             setButtonWorking('resetBtn', false);
@@ -433,6 +455,12 @@
                     const initialSliderValue = particleCountToSlider(3000); // Default from config
                     document.getElementById('particleCount').value = initialSliderValue;
                     document.getElementById('particleCountValue').textContent = '3,000';
+                    
+                    // Set other initial values
+                    document.getElementById('timeStepValue').textContent = '0.010';
+                    document.getElementById('visualFPSValue').textContent = '30';
+                    document.getElementById('zoomValue').textContent = '1.0x';
+                    document.getElementById('gravityValue').textContent = '1.0';
                 } catch (e) {
                     console.error('Failed to create or start client:', e);
                     setTimeout(() => window.location.reload(), 3000);
@@ -469,6 +497,23 @@
                 debouncedConfigUpdate(() => {
                     client.set_time_step(value);
                 });
+            });
+            
+            document.getElementById('visualFPS').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('visualFPSValue').textContent = value;
+                
+                debouncedConfigUpdate(() => {
+                    client.set_visual_fps(value);
+                }, 100); // Faster response for FPS changes
+            });
+            
+            document.getElementById('zoom').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('zoomValue').textContent = value.toFixed(1) + 'x';
+                
+                // Zoom is immediate (no server communication needed)
+                client.set_zoom_level(value);
             });
             
             document.getElementById('gravity').addEventListener('input', (e) => {

@@ -15,6 +15,7 @@ pub struct Renderer {
     u_view: WebGlUniformLocation,
     width: f32,
     height: f32,
+    zoom: f32,
 }
 
 impl Renderer {
@@ -66,6 +67,7 @@ impl Renderer {
             u_view,
             width: canvas.width() as f32,
             height: canvas.height() as f32,
+            zoom: 1.0,
         })
     }
     
@@ -73,6 +75,10 @@ impl Renderer {
         self.width = width as f32;
         self.height = height as f32;
         self.gl.viewport(0, 0, width as i32, height as i32);
+    }
+    
+    pub fn set_zoom(&mut self, zoom: f32) {
+        self.zoom = zoom;
     }
     
     pub fn render(&self, particles: &[Particle]) {
@@ -134,10 +140,12 @@ impl Renderer {
         let projection = self.perspective_matrix(fov, aspect, near, far);
         self.gl.uniform_matrix4fv_with_f32_array(Some(&self.u_projection), false, &projection);
         
+        // Apply zoom by adjusting camera distance
+        let camera_distance = 20.0 / self.zoom;
         let view = self.look_at_matrix(
-            [0.0, 0.0, 20.0],  // eye
-            [0.0, 0.0, 0.0],   // center
-            [0.0, 1.0, 0.0],   // up
+            [0.0, 0.0, camera_distance],  // eye (zoomed)
+            [0.0, 0.0, 0.0],             // center
+            [0.0, 1.0, 0.0],             // up
         );
         self.gl.uniform_matrix4fv_with_f32_array(Some(&self.u_view), false, &view);
         

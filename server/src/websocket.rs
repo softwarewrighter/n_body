@@ -12,6 +12,7 @@ use crate::config::WebSocketConfig;
 pub struct SimulationWebSocket {
     simulation: Arc<Mutex<Simulation>>,
     last_heartbeat: Instant,
+    last_render: Instant,
     ws_config: WebSocketConfig,
 }
 
@@ -20,6 +21,7 @@ impl SimulationWebSocket {
         Self {
             simulation,
             last_heartbeat: Instant::now(),
+            last_render: Instant::now(),
             ws_config: ws_config.clone(),
         }
     }
@@ -39,9 +41,25 @@ impl SimulationWebSocket {
     }
     
     fn start_simulation_loop(&self, ctx: &mut <Self as Actor>::Context) {
-        let update_interval = Duration::from_millis(33); // Use default for now, could be configurable
-        
-        ctx.run_interval(update_interval, |act, ctx| {
+        // High frequency loop for smooth control, with dynamic FPS limiting
+        ctx.run_interval(Duration::from_millis(16), |act, ctx| {
+            // Check current FPS setting and skip frames if needed
+            let visual_fps = {
+                match act.simulation.lock() {
+                    Ok(sim) => sim.get_config().visual_fps,
+                    Err(_) => 30, // fallback
+                }
+            };
+            let target_interval_ms = 1000 / visual_fps;
+            
+            // Check if enough time has passed for next frame
+            if act.last_render.elapsed().as_millis() < target_interval_ms as u128 {
+                return; // Skip this frame
+            }
+            
+            // Update last render time
+            act.last_render = Instant::now();
+            
             // Check if context is still valid (client connected)
             if ctx.state() != actix::ActorState::Running {
                 return;

@@ -18,6 +18,8 @@ impl Simulation {
             particle_count: sim_config.default_particles,
             time_step: 0.01,
             gravity_strength: 1.0,
+            visual_fps: 30,
+            zoom_level: 1.0,
         };
         
         let mut sim = Simulation {
