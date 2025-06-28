@@ -1,8 +1,22 @@
+# Build outputs
 /target
 /pkg
 /server/pkg
+/client/pkg
+/client/www/
+/www/pkg
+
+# Dependencies
 /node_modules
 Cargo.lock
+
+# Generated files
 **/*.rs.bk
+server.log
+*.log
+
+# System files
 .DS_Store
+
+# IDE and tools
 .claude/
