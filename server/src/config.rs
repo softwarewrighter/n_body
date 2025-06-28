@@ -57,7 +57,7 @@ impl Config {
         
         if Path::new(config_path).exists() {
             match fs::read_to_string(config_path) {
-                Ok(content) => match toml::from_str(&content) {
+                Ok(content) => match toml::from_str::<Config>(&content) {
                     Ok(mut config) => {
                         log::info!("Loaded configuration from {}", config_path);
                         
