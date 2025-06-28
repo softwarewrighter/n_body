@@ -7,22 +7,26 @@ use std::time::{Duration, Instant};
 
 use crate::simulation::Simulation;
 
-use crate::config::WebSocketConfig;
+use crate::config::{WebSocketConfig, SimulationConfig};
 
 pub struct SimulationWebSocket {
     simulation: Arc<Mutex<Simulation>>,
     last_heartbeat: Instant,
     last_render: Instant,
+    last_physics_update: Instant,
     ws_config: WebSocketConfig,
+    sim_config: SimulationConfig,
 }
 
 impl SimulationWebSocket {
-    pub fn new(simulation: Arc<Mutex<Simulation>>, ws_config: &WebSocketConfig) -> Self {
+    pub fn new(simulation: Arc<Mutex<Simulation>>, ws_config: &WebSocketConfig, sim_config: &SimulationConfig) -> Self {
         Self {
             simulation,
             last_heartbeat: Instant::now(),
             last_render: Instant::now(),
+            last_physics_update: Instant::now(),
             ws_config: ws_config.clone(),
+            sim_config: sim_config.clone(),
         }
     }
     
@@ -41,51 +45,55 @@ impl SimulationWebSocket {
     }
     
     fn start_simulation_loop(&self, ctx: &mut <Self as Actor>::Context) {
-        // High frequency loop for smooth control, with dynamic FPS limiting
-        ctx.run_interval(Duration::from_millis(16), |act, ctx| {
-            // Check current FPS setting and skip frames if needed
-            let visual_fps = {
-                match act.simulation.lock() {
-                    Ok(sim) => sim.get_config().visual_fps,
-                    Err(_) => 30, // fallback
+        // Run at configured update rate
+        let update_interval = Duration::from_millis(self.sim_config.update_rate_ms);
+        
+        ctx.run_interval(update_interval, |act, ctx| {
+            // Step physics simulation
+            if act.last_physics_update.elapsed() >= Duration::from_millis(act.sim_config.update_rate_ms) {
+                act.last_physics_update = Instant::now();
+                
+                // Check if context is still valid (client connected)
+                if ctx.state() != actix::ActorState::Running {
+                    return;
                 }
-            };
-            let target_interval_ms = 1000 / visual_fps;
-            
-            // Check if enough time has passed for next frame
-            if act.last_render.elapsed().as_millis() < target_interval_ms as u128 {
-                return; // Skip this frame
-            }
-            
-            // Update last render time
-            act.last_render = Instant::now();
-            
-            // Check if context is still valid (client connected)
-            if ctx.state() != actix::ActorState::Running {
-                return;
-            }
-            
-            let (state, stats) = {
-                match act.simulation.lock() {
-                    Ok(mut sim) => sim.step(),
-                    Err(e) => {
-                        error!("Failed to lock simulation: {}", e);
-                        return;
+                
+                let (state, stats) = {
+                    match act.simulation.lock() {
+                        Ok(mut sim) => sim.step(),
+                        Err(e) => {
+                            error!("Failed to lock simulation: {}", e);
+                            return;
+                        }
+                    }
+                };
+                
+                // Check current visual FPS setting
+                let visual_fps = {
+                    match act.simulation.lock() {
+                        Ok(sim) => sim.get_config().visual_fps,
+                        Err(_) => 30, // fallback
+                    }
+                };
+                let render_interval_ms = 1000 / visual_fps;
+                
+                // Only send state update if enough time has passed for visual FPS
+                if act.last_render.elapsed().as_millis() >= render_interval_ms as u128 {
+                    act.last_render = Instant::now();
+                    
+                    // Send state update with error handling
+                    match serde_json::to_string(&ServerMessage::State(state)) {
+                        Ok(json) => ctx.text(json),
+                        Err(e) => error!("Failed to serialize state: {}", e),
                     }
                 }
-            };
-            
-            // Send state update with error handling
-            match serde_json::to_string(&ServerMessage::State(state)) {
-                Ok(json) => ctx.text(json),
-                Err(e) => error!("Failed to serialize state: {}", e),
-            }
-            
-            // Send stats every 30 frames
-            if stats.frame_number % 30 == 0 {
-                match serde_json::to_string(&ServerMessage::Stats(stats)) {
-                    Ok(json) => ctx.text(json),
-                    Err(e) => error!("Failed to serialize stats: {}", e),
+                
+                // Send stats every 30 frames
+                if stats.frame_number % 30 == 0 {
+                    match serde_json::to_string(&ServerMessage::Stats(stats)) {
+                        Ok(json) => ctx.text(json),
+                        Err(e) => error!("Failed to serialize stats: {}", e),
+                    }
                 }
             }
         });

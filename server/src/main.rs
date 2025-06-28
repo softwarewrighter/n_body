@@ -25,7 +25,8 @@ async fn ws_index(
 ) -> Result<HttpResponse, Error> {
     let simulation = data.simulation.clone();
     let ws_config = &data.config.websocket;
-    ws::start(SimulationWebSocket::new(simulation, ws_config), &req, stream)
+    let sim_config = &data.config.simulation;
+    ws::start(SimulationWebSocket::new(simulation, ws_config, sim_config), &req, stream)
 }
 
 async fn index() -> Result<HttpResponse, Error> {
