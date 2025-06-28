@@ -2,5 +2,37 @@
 name = "n_body"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document", 
+    "Element",
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "WebGlRenderingContext",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlBuffer",
+    "WebGlUniformLocation",
+    "CanvasRenderingContext2d",
+    "Performance",
+    "console"
+]}
+js-sys = "0.3"
+nalgebra = { version = "0.33", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Body Galaxy Collision Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        #canvas {
+            display: block;
+            cursor: grab;
+        }
+        
+        #canvas:active {
+            cursor: grabbing;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+        }
+        
+        #controls h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 5px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+        }
+        
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .control-group button {
+            width: 100%;
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .control-group button:hover {
+            background: #45a049;
+        }
+        
+        .control-group button:active {
+            background: #3d8b40;
+        }
+        
+        #stats {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .stat-line {
+            margin-bottom: 5px;
+        }
+        
+        .value {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="controls">
+        <h2>Galaxy Collision Controls</h2>
+        
+        <div class="control-group">
+            <label for="particleCount">Particles: <span id="particleCountValue">10000</span></label>
+            <input type="range" id="particleCount" min="1000" max="100000" value="10000" step="1000">
+        </div>
+        
+        <div class="control-group">
+            <label for="timeStep">Time Step: <span id="timeStepValue">0.01</span></label>
+            <input type="range" id="timeStep" min="0.001" max="0.1" value="0.01" step="0.001">
+        </div>
+        
+        <div class="control-group">
+            <label for="gravity">Gravity Strength: <span id="gravityValue">1.0</span></label>
+            <input type="range" id="gravity" min="0.1" max="5.0" value="1.0" step="0.1">
+        </div>
+        
+        <div class="control-group">
+            <button id="resetBtn">Reset Simulation</button>
+        </div>
+        
+        <div class="control-group">
+            <button id="pauseBtn">Pause</button>
+        </div>
+    </div>
+    
+    <div id="stats">
+        <div class="stat-line">FPS: <span class="value" id="fps">0</span></div>
+        <div class="stat-line">Sim Time: <span class="value" id="simTime">0.0</span>s</div>
+        <div class="stat-line">Particles: <span class="value" id="activeParticles">0</span></div>
+        <div class="stat-line">Frame Time: <span class="value" id="frameTime">0</span>ms</div>
+    </div>
+    
+    <div id="loading">Loading WASM...</div>
+    
+    <script type="module">
+        import init, { Simulation } from './pkg/n_body.js';
+        
+        async function run() {
+            await init();
+            
+            const loading = document.getElementById('loading');
+            loading.classList.add('hidden');
+            
+            const canvas = document.getElementById('canvas');
+            const simulation = new Simulation(canvas);
+            
+            // Animation loop
+            function animate() {
+                simulation.step();
+                requestAnimationFrame(animate);
+            }
+            
+            // Start the simulation
+            simulation.start();
+            simulation.resize();
+            animate();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                simulation.resize();
+            });
+            
+            // Control handlers
+            document.getElementById('particleCount').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('particleCountValue').textContent = value;
+                simulation.set_particle_count(value);
+            });
+            
+            document.getElementById('timeStep').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('timeStepValue').textContent = value.toFixed(3);
+                simulation.set_time_step(value);
+            });
+            
+            document.getElementById('gravity').addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                document.getElementById('gravityValue').textContent = value.toFixed(1);
+                simulation.set_gravity_strength(value);
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                simulation.reset();
+            });
+            
+            document.getElementById('pauseBtn').addEventListener('click', (e) => {
+                const isPaused = simulation.toggle_pause();
+                e.target.textContent = isPaused ? 'Resume' : 'Pause';
+            });
+            
+            // Update stats
+            setInterval(() => {
+                const stats = simulation.get_stats();
+                document.getElementById('fps').textContent = stats.fps.toFixed(1);
+                document.getElementById('simTime').textContent = stats.sim_time.toFixed(1);
+                document.getElementById('activeParticles').textContent = stats.particle_count;
+                document.getElementById('frameTime').textContent = stats.frame_time.toFixed(2);
+            }, 100);
+        }
+        
+        run();
+    </script>
+</body>
+</html>

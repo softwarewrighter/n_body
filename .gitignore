@@ -1,1 +1,7 @@
 /target
+/pkg
+/node_modules
+Cargo.lock
+**/*.rs.bk
+.DS_Store
+.claude/
