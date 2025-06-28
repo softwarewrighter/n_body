@@ -20,11 +20,11 @@ impl Client {
     #[wasm_bindgen(constructor)]
     pub fn new(canvas: HtmlCanvasElement, server_url: String) -> Result<Client, JsValue> {
         console::log_1(&format!("Connecting to server: {}", server_url).into());
-        
+
         let ws = WebSocket::new(&server_url)?;
-        
+
         let renderer = Renderer::new(&canvas)?;
-        
+
         let config = SimulationConfig {
             particle_count: 3000,
             time_step: 0.01,
@@ -33,7 +33,7 @@ impl Client {
             zoom_level: 1.0,
             debug: false,
         };
-        
+
         Ok(Client {
             ws,
             renderer,
@@ -42,16 +42,16 @@ impl Client {
             config,
         })
     }
-    
+
     pub fn start(&mut self) -> Result<(), JsValue> {
         self.resize();
         self.setup_websocket_handlers()?;
         Ok(())
     }
-    
+
     fn setup_websocket_handlers(&self) -> Result<(), JsValue> {
         let ws = &self.ws;
-        
+
         // On open
         let onopen = Closure::wrap(Box::new(move || {
             console::log_1(&"WebSocket connected".into());
@@ -65,13 +65,13 @@ impl Client {
         }) as Box<dyn FnMut()>);
         ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
         onopen.forget();
-        
+
         // On message - this will be handled by JavaScript
         let onmessage = Closure::wrap(Box::new(move |e: MessageEvent| {
             if let Ok(txt) = e.data().dyn_into::<js_sys::JsString>() {
                 let message = String::from(txt);
                 console::log_1(&format!("Received message: {}", message).into());
-                
+
                 // Call global JavaScript function to handle message
                 let window = web_sys::window().unwrap();
                 if let Some(handler) = window.get("handleWebSocketMessage") {
@@ -83,14 +83,14 @@ impl Client {
         }) as Box<dyn FnMut(MessageEvent)>);
         ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget();
-        
+
         // On error
         let onerror = Closure::wrap(Box::new(move |e: ErrorEvent| {
             console::error_1(&format!("WebSocket error: {:?}", e).into());
         }) as Box<dyn FnMut(ErrorEvent)>);
         ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
         onerror.forget();
-        
+
         // On close
         let onclose = Closure::wrap(Box::new(move || {
             console::log_1(&"WebSocket closed".into());
@@ -104,17 +104,24 @@ impl Client {
         }) as Box<dyn FnMut()>);
         ws.set_onclose(Some(onclose.as_ref().unchecked_ref()));
         onclose.forget();
-        
+
         Ok(())
     }
-    
+
     pub fn handle_message(&mut self, message: String) {
         match serde_json::from_str::<ServerMessage>(&message) {
             Ok(msg) => match msg {
                 ServerMessage::State(state) => {
                     if self.config.debug {
-                        console::log_1(&format!("Received state: {} particles, frame {}, sim_time {:.2}s", 
-                            state.particles.len(), state.frame_number, state.sim_time).into());
+                        console::log_1(
+                            &format!(
+                                "Received state: {} particles, frame {}, sim_time {:.2}s",
+                                state.particles.len(),
+                                state.frame_number,
+                                state.sim_time
+                            )
+                            .into(),
+                        );
                     }
                     self.current_state = Some(state);
                     self.render();
@@ -132,20 +139,29 @@ impl Client {
                         .unwrap();
                 }
                 ServerMessage::Config(config) => {
-                    console::log_1(&format!("Received config: {} particles, debug: {}", config.particle_count, config.debug).into());
+                    console::log_1(
+                        &format!(
+                            "Received config: {} particles, debug: {}",
+                            config.particle_count, config.debug
+                        )
+                        .into(),
+                    );
                     self.config = config.clone();
-                    
+
                     // Enable debug logging if requested
                     if config.debug {
-                        console::log_1(&"Debug mode enabled - verbose client logging active".into());
+                        console::log_1(
+                            &"Debug mode enabled - verbose client logging active".into(),
+                        );
                     }
-                    
+
                     // Update UI elements via JavaScript
                     let window = web_sys::window().unwrap();
                     if let Some(update_ui) = window.get("updateUIFromConfig") {
                         if let Some(function) = update_ui.dyn_ref::<js_sys::Function>() {
                             let config_json = serde_json::to_string(&config).unwrap();
-                            let _ = function.call1(&JsValue::NULL, &JsValue::from_str(&config_json));
+                            let _ =
+                                function.call1(&JsValue::NULL, &JsValue::from_str(&config_json));
                         }
                     }
                 }
@@ -155,25 +171,25 @@ impl Client {
             }
         }
     }
-    
+
     fn render(&self) {
         if let Some(state) = &self.current_state {
             console::log_1(&format!("Rendering {} particles", state.particles.len()).into());
             self.renderer.render(&state.particles);
         }
     }
-    
+
     pub fn resize(&mut self) {
         let window = web_sys::window().unwrap();
         let width = window.inner_width().unwrap().as_f64().unwrap() as u32;
         let height = window.inner_height().unwrap().as_f64().unwrap() as u32;
-        
+
         self.canvas.set_width(width);
         self.canvas.set_height(height);
-        
+
         self.renderer.resize(width, height);
     }
-    
+
     pub fn set_particle_count(&mut self, count: usize) {
         self.config.particle_count = count;
         if self.is_connected() {
@@ -182,7 +198,7 @@ impl Client {
             console::log_1(&"Cannot update particle count: WebSocket not connected".into());
         }
     }
-    
+
     pub fn set_time_step(&mut self, dt: f32) {
         self.config.time_step = dt;
         if self.is_connected() {
@@ -191,7 +207,7 @@ impl Client {
             console::log_1(&"Cannot update time step: WebSocket not connected".into());
         }
     }
-    
+
     pub fn set_gravity_strength(&mut self, strength: f32) {
         self.config.gravity_strength = strength;
         if self.is_connected() {
@@ -200,7 +216,7 @@ impl Client {
             console::log_1(&"Cannot update gravity strength: WebSocket not connected".into());
         }
     }
-    
+
     pub fn set_visual_fps(&mut self, fps: u32) {
         self.config.visual_fps = fps;
         if self.is_connected() {
@@ -209,7 +225,7 @@ impl Client {
             console::log_1(&"Cannot update visual FPS: WebSocket not connected".into());
         }
     }
-    
+
     pub fn set_zoom_level(&mut self, zoom: f32) {
         self.config.zoom_level = zoom;
         self.renderer.set_zoom(zoom);
@@ -219,19 +235,19 @@ impl Client {
             console::log_1(&"Cannot update zoom level: WebSocket not connected".into());
         }
     }
-    
+
     pub fn move_camera(&mut self, dx: f32, dy: f32) {
         self.renderer.move_camera(dx, dy);
     }
-    
+
     pub fn reset_camera(&mut self) {
         self.renderer.reset_camera();
     }
-    
+
     fn is_connected(&self) -> bool {
         self.ws.ready_state() == WebSocket::OPEN
     }
-    
+
     pub fn reset(&self) {
         if self.ws.ready_state() == WebSocket::OPEN {
             let msg = ClientMessage::Reset;
@@ -244,7 +260,7 @@ impl Client {
             console::log_1(&"WebSocket not connected, cannot send reset".into());
         }
     }
-    
+
     pub fn pause(&self) {
         if self.ws.ready_state() == WebSocket::OPEN {
             let msg = ClientMessage::Pause;
@@ -255,7 +271,7 @@ impl Client {
             }
         }
     }
-    
+
     pub fn resume(&self) {
         if self.ws.ready_state() == WebSocket::OPEN {
             let msg = ClientMessage::Resume;
@@ -266,7 +282,7 @@ impl Client {
             }
         }
     }
-    
+
     fn send_config_update(&self) {
         if self.ws.ready_state() == WebSocket::OPEN {
             let msg = ClientMessage::UpdateConfig(self.config.clone());

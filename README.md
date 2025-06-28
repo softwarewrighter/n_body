@@ -15,9 +15,16 @@ A high-performance n-body simulation demonstrating galaxy collisions, powered by
 - Real-time simulation of gravitationally interacting particles
 - Two spiral galaxies on collision course
 - WebGL rendering with particle effects
-- Interactive controls for particle count, time step, and gravity strength
+- Interactive controls:
+  - Logarithmic particle count slider (1K - 1M particles)
+  - Time step (physics speed)
+  - Visual FPS (rendering speed, independent of physics)
+  - Gravity strength
+  - Zoom level with camera controls
+  - Arrow keys for camera movement
 - Live performance monitoring (FPS, computation time, CPU usage)
 - Automatic reconnection on connection loss
+- Debug mode with comprehensive logging
 
 ## Prerequisites
 
@@ -42,10 +49,11 @@ The server uses `config.toml` for configuration (auto-generated on first run):
 [server]
 port = 4000          # Server port (change if 4000 is in use)
 host = "0.0.0.0"     # Bind address
+debug = false        # Enable debug mode (or use N_BODY_DEBUG=1)
 
 [simulation]
-default_particles = 1000    # Starting particle count
-update_rate_ms = 33        # ~30 FPS update rate
+default_particles = 3000    # Starting particle count
+update_rate_ms = 33        # ~30 FPS physics update rate
 stats_frequency = 30       # Send stats every N frames
 
 [websocket]
@@ -59,7 +67,8 @@ The project includes several helper scripts in the `scripts/` directory:
 
 - **`dev.sh`** - Build and start development server (recommended for development)
 - **`build.sh`** - Build the WASM module only
-- **`serve.sh`** - Start the development server (with optional port argument)
+- **`serve.sh`** - Start the production server
+- **`debug.sh`** - Start server with debug logging enabled
 - **`clean.sh`** - Clean build artifacts (use `--all` to also remove Cargo.lock)
 
 ### Examples
@@ -71,8 +80,11 @@ The project includes several helper scripts in the `scripts/` directory:
 # Build only
 ./scripts/build.sh
 
-# Serve on a custom port
-./scripts/serve.sh 3000
+# Start production server
+./scripts/serve.sh
+
+# Run with debug logging
+./scripts/debug.sh
 
 # Clean all build artifacts
 ./scripts/clean.sh --all
@@ -80,20 +92,25 @@ The project includes several helper scripts in the `scripts/` directory:
 
 ## Controls
 
-- **Particle Count**: Adjust the number of particles (1,000 - 100,000)
-- **Time Step**: Control simulation speed
-- **Gravity Strength**: Adjust gravitational constant
-- **Reset**: Reset the simulation with current settings
+- **Particle Count**: Logarithmic slider (1,000 - 1,000,000 particles)
+- **Time Step**: Physics simulation speed (0.005 - 0.05)
+- **Visual FPS**: Rendering frame rate (10 - 60 FPS)
+- **Gravity Strength**: Gravitational constant multiplier
+- **Zoom**: Camera zoom level (0.1x - 5.0x)
+- **Arrow Keys**: Move camera (↑↓←→)
+- **Reset**: Reset simulation and camera
 - **Pause/Resume**: Pause or resume the simulation
 
 ## Performance
 
-With server-side computation on a 72-thread workstation:
+With server-side computation on an 8-core machine:
 - 10,000 particles at 60+ FPS
-- 100,000 particles at 60 FPS
-- 1,000,000 particles at 30+ FPS
+- 100,000 particles at 30+ FPS
 
-Performance scales with CPU cores. The client only needs to render particles.
+Performance scales with:
+- CPU cores (server uses all available cores via Rayon)
+- Network bandwidth (reduced by FPS throttling)
+- Client GPU capability (WebGL rendering)
 
 ## Technical Details
 
@@ -102,10 +119,17 @@ Performance scales with CPU cores. The client only needs to render particles.
 - **Client**: WebGL rendering with custom shaders
 - **Protocol**: JSON messages over WebSocket
 
-## Next Steps (Phase 2)
+## Development Status
 
-- Implement Barnes-Hut algorithm for O(n log n) complexity
-- Add CUDA GPU acceleration for even more particles
-- Implement advanced galaxy generation (different types)
-- Add camera controls (pan, zoom, rotate)
+### Phase 1: CPU Parallelism ✅ Complete
+- Multi-threaded server with Rayon parallelization
+- WebSocket client-server architecture
+- Interactive controls and real-time visualization
+- Performance optimizations for data transfer
+
+### Phase 2: GPU Acceleration (Planned)
+- CUDA implementation for massive particle counts
+- Barnes-Hut algorithm for O(n log n) complexity
+- Advanced galaxy generation (different types)
+- 3D camera controls (rotation)
 - Multiple simultaneous client support

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::simulation::Simulation;
 
-use crate::config::{WebSocketConfig, SimulationConfig};
+use crate::config::{SimulationConfig, WebSocketConfig};
 
 pub struct SimulationWebSocket {
     simulation: Arc<Mutex<Simulation>>,
@@ -19,7 +19,11 @@ pub struct SimulationWebSocket {
 }
 
 impl SimulationWebSocket {
-    pub fn new(simulation: Arc<Mutex<Simulation>>, ws_config: &WebSocketConfig, sim_config: &SimulationConfig) -> Self {
+    pub fn new(
+        simulation: Arc<Mutex<Simulation>>,
+        ws_config: &WebSocketConfig,
+        sim_config: &SimulationConfig,
+    ) -> Self {
         Self {
             simulation,
             last_heartbeat: Instant::now(),
@@ -29,11 +33,11 @@ impl SimulationWebSocket {
             sim_config: sim_config.clone(),
         }
     }
-    
+
     fn start_heartbeat(&self, ctx: &mut <Self as Actor>::Context) {
         let heartbeat_interval = Duration::from_secs(self.ws_config.heartbeat_interval_sec);
         let client_timeout = Duration::from_secs(self.ws_config.client_timeout_sec);
-        
+
         ctx.run_interval(heartbeat_interval, move |act, ctx| {
             if Instant::now().duration_since(act.last_heartbeat) > client_timeout {
                 info!("WebSocket client heartbeat failed, disconnecting");
@@ -43,21 +47,23 @@ impl SimulationWebSocket {
             ctx.ping(b"");
         });
     }
-    
+
     fn start_simulation_loop(&self, ctx: &mut <Self as Actor>::Context) {
         // Run at configured update rate
         let update_interval = Duration::from_millis(self.sim_config.update_rate_ms);
-        
+
         ctx.run_interval(update_interval, |act, ctx| {
             // Step physics simulation
-            if act.last_physics_update.elapsed() >= Duration::from_millis(act.sim_config.update_rate_ms) {
+            if act.last_physics_update.elapsed()
+                >= Duration::from_millis(act.sim_config.update_rate_ms)
+            {
                 act.last_physics_update = Instant::now();
-                
+
                 // Check if context is still valid (client connected)
                 if ctx.state() != actix::ActorState::Running {
                     return;
                 }
-                
+
                 let (state, stats) = {
                     match act.simulation.lock() {
                         Ok(mut sim) => sim.step(),
@@ -67,7 +73,7 @@ impl SimulationWebSocket {
                         }
                     }
                 };
-                
+
                 // Check current visual FPS setting
                 let visual_fps = {
                     match act.simulation.lock() {
@@ -76,18 +82,18 @@ impl SimulationWebSocket {
                     }
                 };
                 let render_interval_ms = 1000 / visual_fps;
-                
+
                 // Only send state update if enough time has passed for visual FPS
                 if act.last_render.elapsed().as_millis() >= render_interval_ms as u128 {
                     act.last_render = Instant::now();
-                    
+
                     // Send state update with error handling
                     match serde_json::to_string(&ServerMessage::State(state)) {
                         Ok(json) => ctx.text(json),
                         Err(e) => error!("Failed to serialize state: {}", e),
                     }
                 }
-                
+
                 // Send stats every 30 frames
                 if stats.frame_number % 30 == 0 {
                     match serde_json::to_string(&ServerMessage::Stats(stats)) {
@@ -102,12 +108,12 @@ impl SimulationWebSocket {
 
 impl Actor for SimulationWebSocket {
     type Context = ws::WebsocketContext<Self>;
-    
+
     fn started(&mut self, ctx: &mut Self::Context) {
         info!("WebSocket connection established");
         self.start_heartbeat(ctx);
         self.start_simulation_loop(ctx);
-        
+
         // Send initial config with error handling
         match self.simulation.lock() {
             Ok(sim) => {
@@ -124,7 +130,7 @@ impl Actor for SimulationWebSocket {
             }
         }
     }
-    
+
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         info!("WebSocket connection closed");
     }
@@ -142,7 +148,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SimulationWebSock
             }
             Ok(ws::Message::Text(text)) => {
                 self.last_heartbeat = Instant::now();
-                
+
                 match serde_json::from_str::<ClientMessage>(&text) {
                     Ok(msg) => {
                         match self.simulation.lock() {
@@ -151,20 +157,24 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SimulationWebSock
                                     ClientMessage::UpdateConfig(config) => {
                                         info!("Updating config: {:?}", config);
                                         sim.update_config(config);
-                                        
+
                                         // Send back updated config to confirm
                                         let updated_config = sim.get_config().clone();
-                                        if let Ok(json) = serde_json::to_string(&ServerMessage::Config(updated_config)) {
+                                        if let Ok(json) = serde_json::to_string(
+                                            &ServerMessage::Config(updated_config),
+                                        ) {
                                             ctx.text(json);
                                         }
                                     }
                                     ClientMessage::Reset => {
                                         info!("Resetting simulation");
                                         sim.reset();
-                                        
+
                                         // Send immediate state update after reset
                                         let (state, _) = sim.step();
-                                        if let Ok(json) = serde_json::to_string(&ServerMessage::State(state)) {
+                                        if let Ok(json) =
+                                            serde_json::to_string(&ServerMessage::State(state))
+                                        {
                                             ctx.text(json);
                                         }
                                     }
@@ -181,7 +191,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SimulationWebSock
                             Err(e) => {
                                 error!("Failed to lock simulation: {}", e);
                                 // Send error message back to client
-                                if let Ok(json) = serde_json::to_string(&"Server error: simulation lock failed") {
+                                if let Ok(json) =
+                                    serde_json::to_string(&"Server error: simulation lock failed")
+                                {
                                     ctx.text(json);
                                 }
                             }

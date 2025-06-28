@@ -54,19 +54,19 @@ impl Default for Config {
 impl Config {
     pub fn load() -> Self {
         let config_path = "config.toml";
-        
+
         if Path::new(config_path).exists() {
             match fs::read_to_string(config_path) {
                 Ok(content) => match toml::from_str::<Config>(&content) {
                     Ok(mut config) => {
                         log::info!("Loaded configuration from {}", config_path);
-                        
+
                         // Check for debug environment variable override
                         if std::env::var("N_BODY_DEBUG").is_ok() {
                             config.server.debug = true;
                             log::info!("Debug mode enabled via N_BODY_DEBUG environment variable");
                         }
-                        
+
                         config
                     }
                     Err(e) => {
@@ -82,20 +82,20 @@ impl Config {
         } else {
             log::info!("No config.toml found, using default configuration");
             let mut config = Self::default();
-            
+
             // Check for debug environment variable override
             if std::env::var("N_BODY_DEBUG").is_ok() {
                 config.server.debug = true;
                 log::info!("Debug mode enabled via N_BODY_DEBUG environment variable");
             }
-            
+
             // Write default config file
             if let Ok(toml_str) = toml::to_string_pretty(&config) {
                 if let Err(e) = fs::write(config_path, toml_str) {
                     log::warn!("Failed to write default config: {}", e);
                 }
             }
-            
+
             config
         }
     }

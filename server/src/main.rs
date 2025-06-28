@@ -26,7 +26,11 @@ async fn ws_index(
     let simulation = data.simulation.clone();
     let ws_config = &data.config.websocket;
     let sim_config = &data.config.simulation;
-    ws::start(SimulationWebSocket::new(simulation, ws_config, sim_config), &req, stream)
+    ws::start(
+        SimulationWebSocket::new(simulation, ws_config, sim_config),
+        &req,
+        stream,
+    )
 }
 
 async fn index() -> Result<HttpResponse, Error> {
@@ -42,31 +46,37 @@ async fn main() -> std::io::Result<()> {
 
     // Load configuration
     let config = Config::load();
-    
+
     let num_threads = num_cpus::get();
     info!("Starting N-Body server with {} CPU threads", num_threads);
-    
+
     if config.server.debug {
         info!("=== DEBUG MODE ENABLED ===");
         info!("Server config: {:?}", config.server);
         info!("Simulation config: {:?}", config.simulation);
         info!("WebSocket config: {:?}", config.websocket);
     }
-    
+
     // Initialize rayon with all available threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
 
-    let simulation = Arc::new(Mutex::new(Simulation::new(&config.simulation, config.server.debug)));
-    let app_state = web::Data::new(AppState { 
+    let simulation = Arc::new(Mutex::new(Simulation::new(
+        &config.simulation,
+        config.server.debug,
+    )));
+    let app_state = web::Data::new(AppState {
         simulation,
         config: config.clone(),
     });
 
     let bind_address = format!("{}:{}", config.server.host, config.server.port);
-    info!("Server starting at http://{}:{}", config.server.host, config.server.port);
+    info!(
+        "Server starting at http://{}:{}",
+        config.server.host, config.server.port
+    );
     info!("Current working directory: {:?}", std::env::current_dir());
 
     HttpServer::new(move || {
