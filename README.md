@@ -32,7 +32,26 @@ A high-performance n-body simulation demonstrating galaxy collisions, powered by
    ```bash
    ./scripts/dev.sh
    ```
-3. Open http://localhost:8000 in your browser
+3. Open http://localhost:4000 in your browser
+
+## Configuration
+
+The server uses `config.toml` for configuration (auto-generated on first run):
+
+```toml
+[server]
+port = 4000          # Server port (change if 4000 is in use)
+host = "0.0.0.0"     # Bind address
+
+[simulation]
+default_particles = 1000    # Starting particle count
+update_rate_ms = 33        # ~30 FPS update rate
+stats_frequency = 30       # Send stats every N frames
+
+[websocket]
+heartbeat_interval_sec = 5  # WebSocket ping interval
+client_timeout_sec = 10     # Client timeout
+```
 
 ## Scripts
 
