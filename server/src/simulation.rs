@@ -41,8 +41,13 @@ impl Simulation {
     
     pub fn update_config(&mut self, config: SimulationConfig) {
         let need_reset = self.config.particle_count != config.particle_count;
+        let old_count = self.config.particle_count;
+        let new_count = config.particle_count;
         self.config = config;
+        
         if need_reset {
+            // Log the particle count change for better UX feedback
+            log::info!("Particle count changed from {} to {}, resetting simulation", old_count, new_count);
             self.reset();
         }
     }
@@ -89,6 +94,7 @@ impl Simulation {
             particle_count: self.particles.len(),
             sim_time: self.sim_time,
             cpu_usage: self.estimate_cpu_usage(),
+            frame_number: self.frame_number,
         };
         
         (state, stats)

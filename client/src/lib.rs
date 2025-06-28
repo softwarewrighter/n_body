@@ -165,17 +165,33 @@ impl Client {
     
     pub fn set_particle_count(&mut self, count: usize) {
         self.config.particle_count = count;
-        self.send_config_update();
+        if self.is_connected() {
+            self.send_config_update();
+        } else {
+            console::log_1(&"Cannot update particle count: WebSocket not connected".into());
+        }
     }
     
     pub fn set_time_step(&mut self, dt: f32) {
         self.config.time_step = dt;
-        self.send_config_update();
+        if self.is_connected() {
+            self.send_config_update();
+        } else {
+            console::log_1(&"Cannot update time step: WebSocket not connected".into());
+        }
     }
     
     pub fn set_gravity_strength(&mut self, strength: f32) {
         self.config.gravity_strength = strength;
-        self.send_config_update();
+        if self.is_connected() {
+            self.send_config_update();
+        } else {
+            console::log_1(&"Cannot update gravity strength: WebSocket not connected".into());
+        }
+    }
+    
+    fn is_connected(&self) -> bool {
+        self.ws.ready_state() == WebSocket::OPEN
     }
     
     pub fn reset(&self) {

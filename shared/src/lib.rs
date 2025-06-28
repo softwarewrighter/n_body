@@ -30,6 +30,7 @@ pub struct SimulationStats {
     pub particle_count: usize,
     pub sim_time: f32,
     pub cpu_usage: f32,
+    pub frame_number: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

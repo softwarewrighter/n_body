@@ -42,20 +42,32 @@ impl SimulationWebSocket {
         let update_interval = Duration::from_millis(33); // Use default for now, could be configurable
         
         ctx.run_interval(update_interval, |act, ctx| {
+            // Check if context is still valid (client connected)
+            if ctx.state() != actix::ActorState::Running {
+                return;
+            }
+            
             let (state, stats) = {
-                let mut sim = act.simulation.lock().unwrap();
-                sim.step()
+                match act.simulation.lock() {
+                    Ok(mut sim) => sim.step(),
+                    Err(e) => {
+                        error!("Failed to lock simulation: {}", e);
+                        return;
+                    }
+                }
             };
             
-            // Send state update
-            if let Ok(json) = serde_json::to_string(&ServerMessage::State(state)) {
-                ctx.text(json);
+            // Send state update with error handling
+            match serde_json::to_string(&ServerMessage::State(state)) {
+                Ok(json) => ctx.text(json),
+                Err(e) => error!("Failed to serialize state: {}", e),
             }
             
             // Send stats every 30 frames
-            if stats.sim_time as u64 % 30 == 0 {
-                if let Ok(json) = serde_json::to_string(&ServerMessage::Stats(stats)) {
-                    ctx.text(json);
+            if stats.frame_number % 30 == 0 {
+                match serde_json::to_string(&ServerMessage::Stats(stats)) {
+                    Ok(json) => ctx.text(json),
+                    Err(e) => error!("Failed to serialize stats: {}", e),
                 }
             }
         });
@@ -70,10 +82,20 @@ impl Actor for SimulationWebSocket {
         self.start_heartbeat(ctx);
         self.start_simulation_loop(ctx);
         
-        // Send initial config
-        let config = self.simulation.lock().unwrap().get_config().clone();
-        if let Ok(json) = serde_json::to_string(&ServerMessage::Config(config)) {
-            ctx.text(json);
+        // Send initial config with error handling
+        match self.simulation.lock() {
+            Ok(sim) => {
+                let config = sim.get_config().clone();
+                match serde_json::to_string(&ServerMessage::Config(config)) {
+                    Ok(json) => ctx.text(json),
+                    Err(e) => error!("Failed to serialize initial config: {}", e),
+                }
+            }
+            Err(e) => {
+                error!("Failed to lock simulation for initial config: {}", e);
+                // Close connection if we can't access simulation
+                ctx.stop();
+            }
         }
     }
     
@@ -93,29 +115,59 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SimulationWebSock
                 self.last_heartbeat = Instant::now();
             }
             Ok(ws::Message::Text(text)) => {
+                self.last_heartbeat = Instant::now();
+                
                 match serde_json::from_str::<ClientMessage>(&text) {
                     Ok(msg) => {
-                        let mut sim = self.simulation.lock().unwrap();
-                        match msg {
-                            ClientMessage::UpdateConfig(config) => {
-                                info!("Updating config: {:?}", config);
-                                sim.update_config(config);
+                        match self.simulation.lock() {
+                            Ok(mut sim) => {
+                                match msg {
+                                    ClientMessage::UpdateConfig(config) => {
+                                        info!("Updating config: {:?}", config);
+                                        sim.update_config(config);
+                                        
+                                        // Send back updated config to confirm
+                                        let updated_config = sim.get_config().clone();
+                                        if let Ok(json) = serde_json::to_string(&ServerMessage::Config(updated_config)) {
+                                            ctx.text(json);
+                                        }
+                                    }
+                                    ClientMessage::Reset => {
+                                        info!("Resetting simulation");
+                                        sim.reset();
+                                        
+                                        // Send immediate state update after reset
+                                        let (state, _) = sim.step();
+                                        if let Ok(json) = serde_json::to_string(&ServerMessage::State(state)) {
+                                            ctx.text(json);
+                                        }
+                                    }
+                                    ClientMessage::Pause => {
+                                        info!("Pausing simulation");
+                                        sim.set_paused(true);
+                                    }
+                                    ClientMessage::Resume => {
+                                        info!("Resuming simulation");
+                                        sim.set_paused(false);
+                                    }
+                                }
                             }
-                            ClientMessage::Reset => {
-                                info!("Resetting simulation");
-                                sim.reset();
-                            }
-                            ClientMessage::Pause => {
-                                info!("Pausing simulation");
-                                sim.set_paused(true);
-                            }
-                            ClientMessage::Resume => {
-                                info!("Resuming simulation");
-                                sim.set_paused(false);
+                            Err(e) => {
+                                error!("Failed to lock simulation: {}", e);
+                                // Send error message back to client
+                                if let Ok(json) = serde_json::to_string(&"Server error: simulation lock failed") {
+                                    ctx.text(json);
+                                }
                             }
                         }
                     }
-                    Err(e) => error!("Failed to parse client message: {}", e),
+                    Err(e) => {
+                        error!("Failed to parse client message '{}': {}", text, e);
+                        // Send error message back to client
+                        if let Ok(json) = serde_json::to_string(&format!("Parse error: {}", e)) {
+                            ctx.text(json);
+                        }
+                    }
                 }
             }
             Ok(ws::Message::Binary(_)) => {}

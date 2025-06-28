@@ -84,8 +84,13 @@
             border: none;
         }
         
+        .button-row {
+            display: flex;
+            gap: 10px;
+        }
+        
         .control-group button {
-            width: 100%;
+            flex: 1;
             padding: 10px;
             background: #4CAF50;
             color: white;
@@ -93,15 +98,53 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
-            transition: background 0.3s;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
         }
         
         .control-group button:hover {
             background: #45a049;
+            transform: translateY(-1px);
         }
         
         .control-group button:active {
             background: #3d8b40;
+            transform: translateY(0);
+        }
+        
+        .control-group button.paused {
+            background: #ff9800;
+        }
+        
+        .control-group button.paused:hover {
+            background: #f57c00;
+        }
+        
+        .control-group button.working {
+            background: #757575;
+            cursor: not-allowed;
+            animation: pulse 1s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+        
+        .slider-hints {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .help-text {
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+            font-style: italic;
         }
         
         #stats {
@@ -177,8 +220,15 @@
         <div class="server-indicator">Computation: Server-side (72 threads)</div>
         
         <div class="control-group">
-            <label for="particleCount">Particles: <span id="particleCountValue">10000</span></label>
-            <input type="range" id="particleCount" min="1000" max="1000000" value="10000" step="1000">
+            <label for="particleCount">Particles: <span id="particleCountValue">3000</span></label>
+            <input type="range" id="particleCount" min="0" max="100" value="50" step="1">
+            <div class="slider-hints">
+                <span>1K</span>
+                <span>10K</span>
+                <span>100K</span>
+                <span>1M</span>
+            </div>
+            <div class="help-text">Auto-restarts simulation when changed</div>
         </div>
         
         <div class="control-group">
@@ -191,12 +241,9 @@
             <input type="range" id="gravity" min="0.1" max="5.0" value="1.0" step="0.1">
         </div>
         
-        <div class="control-group">
-            <button id="resetBtn">Reset Simulation</button>
-        </div>
-        
-        <div class="control-group">
+        <div class="control-group button-row">
             <button id="pauseBtn">Pause</button>
+            <button id="resetBtn">Reset</button>
         </div>
     </div>
     
@@ -215,6 +262,8 @@
         
         let client = null;
         let isPaused = false;
+        let isConnected = false;
+        let configUpdateTimeout = null;
         
         // Global function for WebSocket message handling
         window.handleWebSocketMessage = function(message) {
@@ -238,9 +287,10 @@
             const config = JSON.parse(configJson);
             console.log('Updating UI with config:', config);
             
-            // Update particle count slider and display
-            document.getElementById('particleCount').value = config.particle_count;
-            document.getElementById('particleCountValue').textContent = config.particle_count;
+            // Update particle count slider and display (using logarithmic scale)
+            const sliderValue = particleCountToSlider(config.particle_count);
+            document.getElementById('particleCount').value = sliderValue;
+            document.getElementById('particleCountValue').textContent = config.particle_count.toLocaleString();
             
             // Update time step slider and display
             document.getElementById('timeStep').value = config.time_step;
@@ -249,12 +299,18 @@
             // Update gravity strength slider and display
             document.getElementById('gravity').value = config.gravity_strength;
             document.getElementById('gravityValue').textContent = config.gravity_strength.toFixed(1);
+            
+            // Reset button states if they were working
+            setButtonWorking('resetBtn', false);
+            setButtonWorking('pauseBtn', false);
         };
         
         // Global function for connection status updates
         window.updateConnectionStatus = function(connected) {
+            isConnected = connected;
             const status = document.getElementById('connection-status');
-            const serverUrl = document.getElementById('serverUrl')?.textContent || 'ws://localhost:8080/ws';
+            const serverUrl = document.getElementById('serverUrl')?.textContent || 'ws://localhost:4000/ws';
+            
             if (connected) {
                 status.className = 'connected';
                 status.innerHTML = 'Connected to server<div class="server-indicator">Server: ' + serverUrl + '</div>';
@@ -262,73 +318,215 @@
                 status.className = 'disconnected';
                 status.innerHTML = 'Disconnected from server - Reconnecting in 3s...<div class="server-indicator">Server: ' + serverUrl + '</div>';
                 
-                // Auto-reconnect after 3 seconds
+                // Auto-reconnect after 3 seconds with exponential backoff
                 setTimeout(() => {
                     console.log('Attempting to reconnect...');
-                    window.location.reload();
+                    try {
+                        window.location.reload();
+                    } catch (e) {
+                        console.error('Failed to reload:', e);
+                        // Fallback: try again in 5 seconds
+                        setTimeout(() => window.location.reload(), 5000);
+                    }
                 }, 3000);
             }
         };
         
+        // Logarithmic scale conversion for particle count
+        function sliderToParticleCount(sliderValue) {
+            // Convert 0-100 slider to 1000-1000000 particles logarithmically
+            const minLog = Math.log10(1000);    // log10(1000) = 3
+            const maxLog = Math.log10(1000000); // log10(1000000) = 6
+            const logValue = minLog + (sliderValue / 100) * (maxLog - minLog);
+            return Math.round(Math.pow(10, logValue));
+        }
+        
+        function particleCountToSlider(particleCount) {
+            // Convert particle count back to 0-100 slider value
+            const minLog = Math.log10(1000);
+            const maxLog = Math.log10(1000000);
+            const logValue = Math.log10(Math.max(1000, Math.min(1000000, particleCount)));
+            return Math.round(((logValue - minLog) / (maxLog - minLog)) * 100);
+        }
+        
+        // Debounced function for config updates
+        function debouncedConfigUpdate(updateFn, delay = 200) {
+            if (configUpdateTimeout) {
+                clearTimeout(configUpdateTimeout);
+            }
+            configUpdateTimeout = setTimeout(() => {
+                if (isConnected && client) {
+                    try {
+                        updateFn();
+                    } catch (e) {
+                        console.error('Config update failed:', e);
+                    }
+                }
+            }, delay);
+        }
+        
+        // Button state management
+        function setButtonWorking(buttonId, working = true) {
+            const button = document.getElementById(buttonId);
+            if (working) {
+                button.classList.add('working');
+                button.disabled = true;
+                button.dataset.originalText = button.textContent;
+                if (buttonId === 'resetBtn') button.textContent = 'Resetting...';
+                if (buttonId === 'pauseBtn') button.textContent = 'Working...';
+            } else {
+                button.classList.remove('working');
+                button.disabled = false;
+                if (button.dataset.originalText) {
+                    button.textContent = button.dataset.originalText;
+                    delete button.dataset.originalText;
+                }
+            }
+        }
+        
+        // Handle page visibility changes (shift-reload detection)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Page hidden - preparing for potential reload');
+            } else {
+                console.log('Page visible - checking connection');
+                if (!isConnected && client) {
+                    console.log('Page became visible but not connected - attempting reconnection');
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            }
+        });
+        
+        // Handle beforeunload to clean up connections
+        window.addEventListener('beforeunload', () => {
+            if (client && isConnected) {
+                console.log('Page unloading - closing WebSocket');
+                // Client WebSocket will be cleaned up automatically
+            }
+        });
+
         async function run() {
-            await init();
-            
-            const loading = document.getElementById('loading');
-            loading.classList.add('hidden');
-            
-            const canvas = document.getElementById('canvas');
-            
-            // Determine WebSocket URL from current page
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname || 'localhost';
-            const port = window.location.port || '4000';
-            const serverUrl = `${protocol}//${host}:${port}/ws`;
-            
-            document.getElementById('serverUrl').textContent = serverUrl;
-            
-            // Create client
-            client = new Client(canvas, serverUrl);
-            
-            // Start client (WebSocket handlers are set up internally)
-            client.start();
+            try {
+                await init();
+                
+                const loading = document.getElementById('loading');
+                loading.classList.add('hidden');
+                
+                const canvas = document.getElementById('canvas');
+                
+                // Determine WebSocket URL from current page
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.hostname || 'localhost';
+                const port = window.location.port || '4000';
+                const serverUrl = `${protocol}//${host}:${port}/ws`;
+                
+                document.getElementById('serverUrl').textContent = serverUrl;
+                
+                // Create client with error handling
+                try {
+                    client = new Client(canvas, serverUrl);
+                    
+                    // Start client (WebSocket handlers are set up internally)
+                    client.start();
+                    
+                    // Initialize slider values based on config
+                    const initialSliderValue = particleCountToSlider(3000); // Default from config
+                    document.getElementById('particleCount').value = initialSliderValue;
+                    document.getElementById('particleCountValue').textContent = '3,000';
+                } catch (e) {
+                    console.error('Failed to create or start client:', e);
+                    setTimeout(() => window.location.reload(), 3000);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to initialize WASM:', e);
+                document.getElementById('loading').textContent = 'Failed to load - Retrying in 3s...';
+                setTimeout(() => window.location.reload(), 3000);
+                return;
+            }
             
             // Handle window resize
             window.addEventListener('resize', () => {
                 client.resize();
             });
             
-            // Control handlers
+            // Control handlers with improved UX
             document.getElementById('particleCount').addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
-                document.getElementById('particleCountValue').textContent = value;
-                client.set_particle_count(value);
+                const sliderValue = parseInt(e.target.value);
+                const particleCount = sliderToParticleCount(sliderValue);
+                document.getElementById('particleCountValue').textContent = particleCount.toLocaleString();
+                
+                // Auto-restart simulation when particle count changes significantly
+                debouncedConfigUpdate(() => {
+                    client.set_particle_count(particleCount);
+                }, 400); // Moderate delay for particle count changes
             });
             
             document.getElementById('timeStep').addEventListener('input', (e) => {
                 const value = parseFloat(e.target.value);
                 document.getElementById('timeStepValue').textContent = value.toFixed(3);
-                client.set_time_step(value);
+                
+                debouncedConfigUpdate(() => {
+                    client.set_time_step(value);
+                });
             });
             
             document.getElementById('gravity').addEventListener('input', (e) => {
                 const value = parseFloat(e.target.value);
                 document.getElementById('gravityValue').textContent = value.toFixed(1);
-                client.set_gravity_strength(value);
+                
+                debouncedConfigUpdate(() => {
+                    client.set_gravity_strength(value);
+                });
             });
             
             document.getElementById('resetBtn').addEventListener('click', () => {
-                client.reset();
+                if (!isConnected || !client) {
+                    console.warn('Cannot reset: not connected to server');
+                    return;
+                }
+                
+                try {
+                    setButtonWorking('resetBtn', true);
+                    client.reset();
+                    
+                    // Reset working state after a short delay
+                    setTimeout(() => setButtonWorking('resetBtn', false), 1000);
+                } catch (e) {
+                    console.error('Reset failed:', e);
+                    setButtonWorking('resetBtn', false);
+                }
             });
             
             document.getElementById('pauseBtn').addEventListener('click', (e) => {
-                if (isPaused) {
-                    client.resume();
-                    e.target.textContent = 'Pause';
-                } else {
-                    client.pause();
-                    e.target.textContent = 'Resume';
+                if (!isConnected || !client) {
+                    console.warn('Cannot pause/resume: not connected to server');
+                    return;
                 }
-                isPaused = !isPaused;
+                
+                try {
+                    setButtonWorking('pauseBtn', true);
+                    
+                    if (isPaused) {
+                        client.resume();
+                        setTimeout(() => {
+                            e.target.textContent = 'Pause';
+                            e.target.classList.remove('paused');
+                            setButtonWorking('pauseBtn', false);
+                        }, 300);
+                    } else {
+                        client.pause();
+                        setTimeout(() => {
+                            e.target.textContent = 'Resume';
+                            e.target.classList.add('paused');
+                            setButtonWorking('pauseBtn', false);
+                        }, 300);
+                    }
+                    isPaused = !isPaused;
+                } catch (e) {
+                    console.error('Pause/resume failed:', e);
+                    setButtonWorking('pauseBtn', false);
+                }
             });
         }
         
