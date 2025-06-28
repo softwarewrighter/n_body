@@ -4,15 +4,18 @@ use actix_web_actors::ws;
 use log::info;
 use std::sync::{Arc, Mutex};
 
+mod config;
 mod physics;
 mod simulation;
 mod websocket;
 
+use config::Config;
 use simulation::Simulation;
 use websocket::SimulationWebSocket;
 
 pub struct AppState {
     simulation: Arc<Mutex<Simulation>>,
+    config: Config,
 }
 
 async fn ws_index(
@@ -21,7 +24,8 @@ async fn ws_index(
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let simulation = data.simulation.clone();
-    ws::start(SimulationWebSocket::new(simulation), &req, stream)
+    let ws_config = &data.config.websocket;
+    ws::start(SimulationWebSocket::new(simulation, ws_config), &req, stream)
 }
 
 async fn index() -> Result<HttpResponse, Error> {
@@ -35,6 +39,9 @@ async fn index() -> Result<HttpResponse, Error> {
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
+    // Load configuration
+    let config = Config::load();
+    
     let num_threads = num_cpus::get();
     info!("Starting N-Body server with {} CPU threads", num_threads);
     
@@ -44,10 +51,14 @@ async fn main() -> std::io::Result<()> {
         .build_global()
         .unwrap();
 
-    let simulation = Arc::new(Mutex::new(Simulation::new()));
-    let app_state = web::Data::new(AppState { simulation });
+    let simulation = Arc::new(Mutex::new(Simulation::new(&config.simulation)));
+    let app_state = web::Data::new(AppState { 
+        simulation,
+        config: config.clone(),
+    });
 
-    info!("Server starting at http://localhost:8080");
+    let bind_address = format!("{}:{}", config.server.host, config.server.port);
+    info!("Server starting at http://{}:{}", config.server.host, config.server.port);
     info!("Current working directory: {:?}", std::env::current_dir());
 
     HttpServer::new(move || {
@@ -65,7 +76,7 @@ async fn main() -> std::io::Result<()> {
             .route("/ws", web::get().to(ws_index))
             .service(actix_files::Files::new("/pkg", "server/pkg").show_files_listing())
     })
-    .bind("0.0.0.0:8080")?
+    .bind(&bind_address)?
     .run()
     .await
 }

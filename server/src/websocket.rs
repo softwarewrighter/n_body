@@ -7,26 +7,29 @@ use std::time::{Duration, Instant};
 
 use crate::simulation::Simulation;
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-const SIMULATION_INTERVAL: Duration = Duration::from_millis(33); // ~30 FPS
+use crate::config::WebSocketConfig;
 
 pub struct SimulationWebSocket {
     simulation: Arc<Mutex<Simulation>>,
     last_heartbeat: Instant,
+    ws_config: WebSocketConfig,
 }
 
 impl SimulationWebSocket {
-    pub fn new(simulation: Arc<Mutex<Simulation>>) -> Self {
+    pub fn new(simulation: Arc<Mutex<Simulation>>, ws_config: &WebSocketConfig) -> Self {
         Self {
             simulation,
             last_heartbeat: Instant::now(),
+            ws_config: ws_config.clone(),
         }
     }
     
     fn start_heartbeat(&self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            if Instant::now().duration_since(act.last_heartbeat) > CLIENT_TIMEOUT {
+        let heartbeat_interval = Duration::from_secs(self.ws_config.heartbeat_interval_sec);
+        let client_timeout = Duration::from_secs(self.ws_config.client_timeout_sec);
+        
+        ctx.run_interval(heartbeat_interval, move |act, ctx| {
+            if Instant::now().duration_since(act.last_heartbeat) > client_timeout {
                 info!("WebSocket client heartbeat failed, disconnecting");
                 ctx.stop();
                 return;
@@ -36,7 +39,9 @@ impl SimulationWebSocket {
     }
     
     fn start_simulation_loop(&self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(SIMULATION_INTERVAL, |act, ctx| {
+        let update_interval = Duration::from_millis(33); // Use default for now, could be configurable
+        
+        ctx.run_interval(update_interval, |act, ctx| {
             let (state, stats) = {
                 let mut sim = act.simulation.lock().unwrap();
                 sim.step()

@@ -32,7 +32,7 @@ cd client && wasm-pack build --target web --out-dir ../server/pkg && cd ..
 echo -e "${GREEN}✅ Build complete!${NC}"
 echo -e "${YELLOW}📝 Next steps:${NC}"
 echo -e "   1. Run ${GREEN}./scripts/serve.sh${NC} to start the server"
-echo -e "   2. Open ${GREEN}http://localhost:8080${NC} in your browser"
+echo -e "   2. Open ${GREEN}http://localhost:4000${NC} in your browser"
 echo ""
 echo -e "${YELLOW}📊 Build artifacts:${NC}"
 echo -e "   - Server binary: ${GREEN}target/release/n_body_server${NC}"

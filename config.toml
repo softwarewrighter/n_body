@@ -1,0 +1,15 @@
+[server]
+# Server configuration
+port = 4000
+host = "0.0.0.0"
+
+[simulation]
+# Default simulation parameters
+default_particles = 1000
+update_rate_ms = 33  # ~30 FPS
+stats_frequency = 30  # Send stats every N frames
+
+[websocket]
+# WebSocket configuration
+heartbeat_interval_sec = 5
+client_timeout_sec = 10

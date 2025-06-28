@@ -28,7 +28,7 @@ if [ ! -f "target/release/n_body_server" ]; then
 fi
 
 echo -e "${GREEN}🚀 Starting server...${NC}"
-echo -e "${BLUE}📍 URL: ${GREEN}http://localhost:8080${NC}"
+echo -e "${BLUE}📍 URL: ${GREEN}http://localhost:4000${NC} (configurable in config.toml)"
 echo -e "${YELLOW}📝 Server will use all available CPU cores for physics computation${NC}"
 echo -e "${YELLOW}📝 Press Ctrl+C to stop the server${NC}"
 echo ""

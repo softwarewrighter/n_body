@@ -1,8 +1,18 @@
-[2025-06-28T16:49:12Z INFO  n_body_server] Starting N-Body server with 8 CPU threads
-[2025-06-28T16:49:12Z INFO  n_body_server] Server starting at http://localhost:8080
-[2025-06-28T16:49:12Z INFO  n_body_server] Current working directory: Ok("/Users/mike/code/mighty/n_body")
-[2025-06-28T16:49:12Z INFO  actix_server::builder] starting 8 workers
-[2025-06-28T16:49:12Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
-[2025-06-28T16:49:12Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:8080", workers: 8, listening on: 0.0.0.0:8080
-[2025-06-28T16:49:21Z INFO  n_body_server] Index route called
-[2025-06-28T16:49:21Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET / HTTP/1.1" 200 10608 "-" "curl/7.84.0" 0.000198
+[2025-06-28T17:04:10Z INFO  n_body_server::config] Loaded configuration from config.toml
+[2025-06-28T17:04:10Z INFO  n_body_server] Starting N-Body server with 8 CPU threads
+[2025-06-28T17:04:10Z INFO  n_body_server] Server starting at http://0.0.0.0:4000
+[2025-06-28T17:04:10Z INFO  n_body_server] Current working directory: Ok("/Users/mike/code/mighty/n_body")
+[2025-06-28T17:04:10Z INFO  actix_server::builder] starting 8 workers
+[2025-06-28T17:04:10Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
+[2025-06-28T17:04:10Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:4000", workers: 8, listening on: 0.0.0.0:4000
+[2025-06-28T17:04:25Z INFO  actix_web::middleware::logger] 127.0.0.1 "HEAD / HTTP/1.1" 404 0 "-" "curl/7.84.0" 0.000034
+[2025-06-28T17:04:42Z INFO  actix_server::server] SIGTERM received; starting graceful shutdown
+[2025-06-28T17:04:42Z INFO  actix_server::accept] accept thread stopped
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker
+[2025-06-28T17:04:42Z INFO  actix_server::worker] shutting down idle worker

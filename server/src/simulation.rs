@@ -13,9 +13,9 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new() -> Self {
+    pub fn new(sim_config: &crate::config::SimulationConfig) -> Self {
         let config = SimulationConfig {
-            particle_count: 1000,
+            particle_count: sim_config.default_particles,
             time_step: 0.01,
             gravity_strength: 1.0,
         };

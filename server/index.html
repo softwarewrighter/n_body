@@ -260,10 +260,10 @@
             
             const canvas = document.getElementById('canvas');
             
-            // Determine WebSocket URL
+            // Determine WebSocket URL from current page
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.hostname || 'localhost';
-            const port = window.location.port || '8080';
+            const port = window.location.port || '4000';
             const serverUrl = `${protocol}//${host}:${port}/ws`;
             
             document.getElementById('serverUrl').textContent = serverUrl;
