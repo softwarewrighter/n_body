@@ -2,6 +2,8 @@
 
 A high-performance n-body simulation demonstrating galaxy collisions, powered by a multi-threaded Rust server and WebAssembly client.
 
+![N-Body Simulation Screenshot](images/snapshot.png)
+
 ## Architecture
 
 - **Server**: Multi-threaded Rust server using all CPU cores for physics computation
@@ -61,11 +63,34 @@ heartbeat_interval_sec = 5  # WebSocket ping interval
 client_timeout_sec = 10     # Client timeout
 ```
 
+## Making UI Changes
+
+Changes to files in the `www/` directory (HTML, CSS, JavaScript) require the server to be restarted to take effect due to static file caching. Follow this workflow:
+
+1. Stop the running server (Ctrl+C)
+2. Rebuild the project:
+   ```bash
+   ./scripts/build-all.sh  # Builds both server and WASM client
+   ```
+3. Restart the server:
+   ```bash
+   ./scripts/serve.sh
+   ```
+
+**Note**: The WASM client code (in `client/` directory) uses `wasm-bindgen` and is compiled to the `server/pkg/` directory. Changes to client Rust code also require rebuilding with `build-all.sh` or `build.sh`.
+
+For a complete clean rebuild (recommended when encountering caching issues):
+```bash
+./scripts/dev.sh --clean
+```
+
 ## Scripts
 
 The project includes several helper scripts in the `scripts/` directory:
 
 - **`dev.sh`** - Build and start development server (recommended for development)
+  - Use `--clean` flag to clean build artifacts before building
+- **`build-all.sh`** - Build both WASM client and server binary
 - **`build.sh`** - Build the WASM module only
 - **`serve.sh`** - Start the production server
 - **`debug.sh`** - Start server with debug logging enabled
@@ -77,10 +102,16 @@ The project includes several helper scripts in the `scripts/` directory:
 # Build and serve (development mode)
 ./scripts/dev.sh
 
-# Build only
+# Build and serve with clean rebuild (useful for caching issues)
+./scripts/dev.sh --clean
+
+# Build both WASM client and server
+./scripts/build-all.sh
+
+# Build WASM client only
 ./scripts/build.sh
 
-# Start production server
+# Start production server (requires prior build)
 ./scripts/serve.sh
 
 # Run with debug logging
@@ -97,7 +128,7 @@ The project includes several helper scripts in the `scripts/` directory:
 - **Visual FPS**: Rendering frame rate (10 - 60 FPS)
 - **Gravity Strength**: Gravitational constant multiplier
 - **Zoom**: Camera zoom level (0.1x - 5.0x)
-- **Arrow Keys**: Move camera (↑↓←→)
+- **Arrow Keys**: Move camera (Up/Down/Left/Right)
 - **Reset**: Reset simulation and camera
 - **Pause/Resume**: Pause or resume the simulation
 
@@ -121,7 +152,7 @@ Performance scales with:
 
 ## Development Status
 
-### Phase 1: CPU Parallelism ✅ Complete
+### Phase 1: CPU Parallelism - Complete
 - Multi-threaded server with Rayon parallelization
 - WebSocket client-server architecture
 - Interactive controls and real-time visualization
