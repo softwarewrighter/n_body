@@ -1,4 +1,7 @@
-use n_body_shared::{Particle, SimulationConfig, SimulationState, SimulationStats};
+use n_body_shared::{
+    Particle, SimulationConfig, SimulationState, SimulationStats, MAX_COMPUTATION_TIME_MS,
+    MAX_PARTICLES,
+};
 use nalgebra::{Point3, Vector3};
 use rayon::prelude::*;
 use std::time::Instant;
@@ -10,6 +13,7 @@ pub struct Simulation {
     frame_number: u64,
     is_paused: bool,
     last_computation_time: f32,
+    consecutive_slow_frames: u32,
 }
 
 impl Simulation {
@@ -30,6 +34,7 @@ impl Simulation {
             frame_number: 0,
             is_paused: false,
             last_computation_time: 0.0,
+            consecutive_slow_frames: 0,
         };
 
         sim.reset();
@@ -42,7 +47,15 @@ impl Simulation {
         self.frame_number = 0;
     }
 
-    pub fn update_config(&mut self, config: SimulationConfig) {
+    pub fn update_config(&mut self, config: SimulationConfig) -> Result<(), String> {
+        // Validate particle count
+        if config.particle_count > MAX_PARTICLES {
+            return Err(format!(
+                "Particle count {} exceeds maximum of {}. Please reduce the particle count to prevent server overload.",
+                config.particle_count, MAX_PARTICLES
+            ));
+        }
+
         let need_reset = self.config.particle_count != config.particle_count;
         let old_count = self.config.particle_count;
         let new_count = config.particle_count;
@@ -57,6 +70,8 @@ impl Simulation {
             );
             self.reset();
         }
+
+        Ok(())
     }
 
     pub fn set_paused(&mut self, paused: bool) {
@@ -84,6 +99,33 @@ impl Simulation {
         }
 
         self.last_computation_time = start.elapsed().as_secs_f32() * 1000.0;
+
+        // Monitor computation time and log warnings
+        if self.last_computation_time > MAX_COMPUTATION_TIME_MS {
+            self.consecutive_slow_frames += 1;
+            if self.consecutive_slow_frames == 1 {
+                log::warn!(
+                    "Computation time {:.1}ms exceeds threshold of {:.1}ms with {} particles ({}² = {} calculations)",
+                    self.last_computation_time,
+                    MAX_COMPUTATION_TIME_MS,
+                    self.particles.len(),
+                    self.particles.len(),
+                    self.particles.len() * self.particles.len()
+                );
+            }
+            if self.consecutive_slow_frames >= 10 {
+                log::error!(
+                    "Server struggling with {} particles - {} consecutive slow frames (avg {:.1}ms/frame). Consider reducing particle count.",
+                    self.particles.len(),
+                    self.consecutive_slow_frames,
+                    self.last_computation_time
+                );
+                // Reset counter to avoid log spam
+                self.consecutive_slow_frames = 0;
+            }
+        } else {
+            self.consecutive_slow_frames = 0;
+        }
 
         let state = SimulationState {
             particles: self.particles.clone(),

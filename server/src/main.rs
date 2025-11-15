@@ -7,14 +7,17 @@ use std::sync::{Arc, Mutex};
 mod config;
 mod physics;
 mod simulation;
+mod watchdog;
 mod websocket;
 
 use config::Config;
 use simulation::Simulation;
+use watchdog::SimulationWatchdog;
 use websocket::SimulationWebSocket;
 
 pub struct AppState {
     simulation: Arc<Mutex<Simulation>>,
+    watchdog: Arc<SimulationWatchdog>,
     config: Config,
 }
 
@@ -24,10 +27,11 @@ async fn ws_index(
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let simulation = data.simulation.clone();
+    let watchdog = data.watchdog.clone();
     let ws_config = &data.config.websocket;
     let sim_config = &data.config.simulation;
     ws::start(
-        SimulationWebSocket::new(simulation, ws_config, sim_config),
+        SimulationWebSocket::new(simulation, watchdog, ws_config, sim_config),
         &req,
         stream,
     )
@@ -67,8 +71,15 @@ async fn main() -> std::io::Result<()> {
         &config.simulation,
         config.server.debug,
     )));
+
+    // Start watchdog thread to monitor for hung computations
+    let watchdog = Arc::new(SimulationWatchdog::new());
+    watchdog.start(10); // 10 second timeout before logging errors
+    info!("Watchdog thread started (10s hang detection)");
+
     let app_state = web::Data::new(AppState {
         simulation,
+        watchdog,
         config: config.clone(),
     });
 

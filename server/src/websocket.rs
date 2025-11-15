@@ -6,11 +6,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::simulation::Simulation;
+use crate::watchdog::SimulationWatchdog;
 
 use crate::config::{SimulationConfig, WebSocketConfig};
 
 pub struct SimulationWebSocket {
     simulation: Arc<Mutex<Simulation>>,
+    watchdog: Arc<SimulationWatchdog>,
     last_heartbeat: Instant,
     last_render: Instant,
     last_physics_update: Instant,
@@ -21,11 +23,13 @@ pub struct SimulationWebSocket {
 impl SimulationWebSocket {
     pub fn new(
         simulation: Arc<Mutex<Simulation>>,
+        watchdog: Arc<SimulationWatchdog>,
         ws_config: &WebSocketConfig,
         sim_config: &SimulationConfig,
     ) -> Self {
         Self {
             simulation,
+            watchdog,
             last_heartbeat: Instant::now(),
             last_render: Instant::now(),
             last_physics_update: Instant::now(),
@@ -66,7 +70,12 @@ impl SimulationWebSocket {
 
                 let (state, stats) = {
                     match act.simulation.lock() {
-                        Ok(mut sim) => sim.step(),
+                        Ok(mut sim) => {
+                            let result = sim.step();
+                            // Update watchdog with current frame number
+                            act.watchdog.heartbeat(result.1.frame_number);
+                            result
+                        }
                         Err(e) => {
                             error!("Failed to lock simulation: {}", e);
                             return;
@@ -156,14 +165,27 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SimulationWebSock
                                 match msg {
                                     ClientMessage::UpdateConfig(config) => {
                                         info!("Updating config: {:?}", config);
-                                        sim.update_config(config);
-
-                                        // Send back updated config to confirm
-                                        let updated_config = sim.get_config().clone();
-                                        if let Ok(json) = serde_json::to_string(
-                                            &ServerMessage::Config(updated_config),
-                                        ) {
-                                            ctx.text(json);
+                                        match sim.update_config(config) {
+                                            Ok(()) => {
+                                                // Send back updated config to confirm
+                                                let updated_config = sim.get_config().clone();
+                                                if let Ok(json) = serde_json::to_string(
+                                                    &ServerMessage::Config(updated_config),
+                                                ) {
+                                                    ctx.text(json);
+                                                }
+                                            }
+                                            Err(error_msg) => {
+                                                error!("Config update failed: {}", error_msg);
+                                                // Send error message to client
+                                                if let Ok(json) =
+                                                    serde_json::to_string(&ServerMessage::Error {
+                                                        message: error_msg,
+                                                    })
+                                                {
+                                                    ctx.text(json);
+                                                }
+                                            }
                                         }
                                     }
                                     ClientMessage::Reset => {

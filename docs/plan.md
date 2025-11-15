@@ -312,3 +312,91 @@ __global__ void calculate_forces_optimized(
 - **Ray tracing integration**: Use RT cores for advanced lighting
 - **Machine learning**: GPU-based parameter optimization
 - **Cloud deployment**: GPU instances for web-based simulation
+
+## Phase 1.5: Hardware-Adaptive Particle Limits (Pre-GPU)
+
+### Current Limitation
+The O(n²) CPU algorithm has a fixed MAX_PARTICLES limit (currently 15K) that is not optimal for all hardware:
+- **Mac M1**: 15K may be too high (limited performance cores)
+- **Mac M3 Pro**: 15K works but can be sluggish at max
+- **High-end workstations** (Xeon, Threadripper): Could handle 25-30K+
+- **Current behavior**: UI hangs at max particles, reset can recover but difficult
+
+### Proposed Solution: Hardware Detection & Dynamic Limits
+
+#### 1. Server-Side Hardware Detection
+Detect and categorize hardware on startup:
+```rust
+enum HardwareClass {
+    LowEnd,      // < 8 cores, < 16GB RAM
+    MidRange,    // 8-16 cores, 16-32GB RAM
+    HighEnd,     // 16+ cores, 32GB+ RAM
+    Workstation, // 24+ cores, 64GB+ RAM
+}
+```
+
+#### 2. Particle Limit Table
+Map hardware classes to safe particle limits:
+
+| Hardware Class | CPU Cores | RAM | MAX_PARTICLES | Expected Frame Time |
+|----------------|-----------|-----|---------------|---------------------|
+| **Low-End** | 4-8 | 8-16GB | 8,000 | ~50ms |
+| **Mid-Range** | 8-12 | 16-32GB | 15,000 | ~100ms |
+| **High-End** | 12-24 | 32-64GB | 25,000 | ~150ms |
+| **Workstation** | 24+ | 64GB+ | 35,000 | ~200ms |
+
+**Apple Silicon Adjustments:**
+- M1/M2: Treat as Mid-Range → 12K particles
+- M3/M3 Pro: Mid-Range+ → 15K particles
+- M3 Max/Ultra: High-End → 20-25K particles
+
+#### 3. GPU-Based Limits (Post-CUDA Implementation)
+Once GPU acceleration is available, create GPU-specific limits:
+
+| GPU Type | VRAM | Compute | MAX_PARTICLES | Expected FPS |
+|----------|------|---------|---------------|--------------|
+| **Integrated** | Shared | Low | 10,000 | 30 FPS |
+| **RTX 3060** | 12GB | Mid | 500,000 | 60 FPS |
+| **RTX 4060/5060** | 12-16GB | Mid-High | 750,000 | 60 FPS |
+| **P40/P100** | 16-24GB | High | 1,000,000 | 60 FPS |
+| **A100/H100** | 40-80GB | Very High | 2,000,000+ | 60+ FPS |
+
+#### 4. Deadman Switch / Auto-Recovery
+Implement automatic recovery mechanisms:
+
+**Option A: Computation Timeout**
+```rust
+// In simulation loop
+if computation_time > TIMEOUT_MS {
+    log::error!("Computation timeout - auto-reducing particles");
+    self.config.particle_count = (self.config.particle_count as f32 * 0.7) as usize;
+    self.reset();
+}
+```
+
+**Option B: Server Restart on Hang**
+- Watchdog detects hang (no frame progress for 30s)
+- Send error message to client
+- Gracefully restart simulation with reduced particle count
+- Log incident for diagnostics
+
+**Option C: Client-Side Circuit Breaker**
+- Client detects no updates for 10 seconds
+- Automatically reduces particle slider by 50%
+- Sends reset command
+- Notifies user: "Reduced particles due to performance"
+
+#### 5. Implementation Priority
+1. **Phase 1.5.1**: Add hardware detection and dynamic MAX_PARTICLES (1 week)
+2. **Phase 1.5.2**: Implement auto-recovery / deadman switch (1 week)
+3. **Phase 1.5.3**: Add GPU detection when CUDA ready (part of Phase 2)
+
+#### 6. Configuration
+Allow override in config.toml:
+```toml
+[simulation]
+auto_detect_limits = true
+force_max_particles = 15000  # Override auto-detection if needed
+enable_auto_recovery = true
+recovery_threshold_ms = 500  # Auto-reduce if frames take >500ms
+```

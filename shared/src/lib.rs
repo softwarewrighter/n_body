@@ -1,6 +1,14 @@
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 
+/// Maximum allowed particle count to prevent server overload
+/// With O(n²) algorithm: 15K particles = 225M calculations per frame
+/// This keeps computation time under 100ms for responsive UI
+pub const MAX_PARTICLES: usize = 15_000;
+
+/// Maximum computation time per frame in milliseconds before triggering warnings
+pub const MAX_COMPUTATION_TIME_MS: f32 = 200.0;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Particle {
     pub position: Point3<f32>,
@@ -52,4 +60,5 @@ pub enum ServerMessage {
     State(SimulationState),
     Stats(SimulationStats),
     Config(SimulationConfig),
+    Error { message: String },
 }

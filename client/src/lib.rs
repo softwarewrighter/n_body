@@ -165,6 +165,13 @@ impl Client {
                         }
                     }
                 }
+                ServerMessage::Error { message } => {
+                    console::error_1(&format!("Server error: {}", message).into());
+
+                    // Show error to user via alert
+                    let window = web_sys::window().unwrap();
+                    let _ = window.alert_with_message(&format!("Server Error: {}", message));
+                }
             },
             Err(e) => {
                 console::error_1(&format!("Failed to parse server message: {}", e).into());
