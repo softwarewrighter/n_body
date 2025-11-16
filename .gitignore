@@ -21,3 +21,6 @@ server-debug.log
 
 # IDE and tools
 .claude/
+
+# MCP
+.playwright-mcp/
