@@ -2,7 +2,7 @@
 
 A high-performance n-body simulation demonstrating galaxy collisions, powered by a multi-threaded Rust server and WebAssembly client.
 
-![N-Body Simulation Screenshot](images/snapshot.png)
+![N-Body Simulation Screenshot](images/snapshot.png?v=2)
 
 ## Architecture
 
